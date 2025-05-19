@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bingo Login</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+  <div id="app" class="w-full max-w-md p-6"></div>
+  <script>
+    const socket = io();
+
+    function renderLogin() {
+      document.getElementById('app').innerHTML = `
+        <div class="bg-white p-8 rounded-lg shadow-md">
+          <h1 class="text-2xl font-bold mb-6 text-center">Bingo Login</h1>
+          <div class="space-y-4">
+            <input id="username" type="text" placeholder="Username" class="w-full p-2 border rounded">
+            <input id="password" type="password" placeholder="Password" class="w-full p-2 border rounded">
+            <button onclick="login()" class="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Login</button>
+            <p id="error" class="text-red-500 hidden">Invalid credentials</p>
+          </div>
+        </div>`;
+    }
+
+    async function login() {
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      const response = await fetch('/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await response.json();
+      if (data.role) {
+        if (data.role === 'admin') window.location.href = '/admin';
+        else if (data.role === 'cashier') window.location.href = '/cashier';
+        else if (data.role === 'display') window.location.href = '/display';
+      } else {
+        document.getElementById('error').classList.remove('hidden');
+      }
+    }
+
+    renderLogin();
+  </script>
+</body>
+</html>

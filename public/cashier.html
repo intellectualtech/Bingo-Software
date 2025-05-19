@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cashier Dashboard - Professional Bingo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Poppins', sans-serif; }
+    .ticket-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+    .ticket-cell { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border: 1px solid #ccc; border-radius: 5px; font-weight: 600; }
+    .drawn { background-color: #facc15; color: #000; }
+    .notification { position: fixed; top: 20px; right: 20px; padding: 10px 20px; background-color: #34d399; color: white; border-radius: 5px; display: none; }
+    .error-notification { background-color: #ef4444; }
+    .lucky-numbers-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; margin-top: 10px; }
+    .lucky-number-cell { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border: 1px solid #ccc; border-radius: 5px; font-weight: 600; }
+  </style>
+</head>
+<body class="bg-gradient-to-r from-green-900 to-green-700 min-h-screen flex items-center justify-center">
+  <div id="notification" class="notification"></div>
+  <div id="app" class="w-full max-w-4xl p-8 bg-white rounded-2xl shadow-xl"></div>
+  <script>
+    const socket = io();
+    let gameState = { 
+      isRunning: false, 
+      drawnBalls: [], 
+      availableBalls: [], 
+      players: [], 
+      transactionHistory: [] 
+    };
+
+    function renderCashierDashboard() {
+      const currentTime = new Date().toLocaleTimeString('en-US', { timeZone: 'Africa/Harare', hour12: true });
+      document.getElementById('app').innerHTML = `
+        <div class="text-center">
+          <h1 class="text-4xl font-bold text-green-900 mb-6">Cashier Dashboard - Professional Bingo</h1>
+          <p class="text-lg text-gray-700 mb-4">Time: ${currentTime} CAT</p>
+          <div class="text-lg font-semibold text-gray-800 mb-4">
+            Game Status: <span class="text-${gameState.isRunning ? 'green' : 'red'}-600">${gameState.isRunning ? 'Running' : 'Stopped'}</span>
+          </div>
+          <div class="bg-gray-100 p-4 rounded-lg mb-6">
+            <h2 class="text-2xl font-semibold text-green-800">Drawn Balls: ${gameState.drawnBalls.join(', ')}</h2>
+          </div>
+          <div class="bg-gray-50 p-6 rounded-lg shadow mb-6">
+            <h2 class="text-2xl font-semibold text-green-800 mb-4">Sell Ticket</h2>
+            <div class="space-y-4">
+              <input id="playerName" type="text" placeholder="Player Name" class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+              <select id="ticketType" class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+                <option value="6">Lucky 6 ($2)</option>
+                <option value="7">Lucky 7 ($5)</option>
+              </select>
+              <div>
+                <label class="block text-left text-gray-700 mb-2">Enter Lucky Numbers (1-48):</label>
+                <input id="luckyNumbers" type="text" placeholder="e.g., 1, 2, 3, 4, 5, 6" class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" oninput="validateLuckyNumbers()">
+              </div>
+              <button onclick="previewTicket()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">Preview Ticket</button>
+              <button onclick="sellTicket()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition" id="sellBtn" disabled>Confirm Sale</button>
+              <div id="ticketPreview" class="mt-4 hidden">
+                <h3 class="font-semibold">Ticket Preview:</h3>
+                <div class="ticket-grid" id="previewGrid"></div>
+                <div class="lucky-numbers-grid mt-2" id="luckyNumbersPreview"></div>
+              </div>
+            </div>
+          </div>
+          <div class="bg-gray-50 p-6 rounded-lg shadow mb-6">
+            <h2 class="text-2xl font-semibold text-green-800 mb-4">Game Control</h2>
+            <button id="startBtn" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition ${gameState.isRunning ? 'hidden' : ''}" onclick="startGame()">Start Game</button>
+            <button id="stopBtn" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition ${!gameState.isRunning ? 'hidden' : ''}" onclick="stopGame()">Stop Game</button>
+          </div>
+          <div class="bg-gray-50 p-6 rounded-lg shadow mb-6">
+            <h2 class="text-2xl font-semibold text-green-800 mb-4">Verify Win</h2>
+            <div class="space-y-4">
+              <input id="verifyPlayerName" type="text" placeholder="Player Name" class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+              <input id="slipNumber" type="text" placeholder="Slip Number" class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+              <button onclick="verifyWin()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">Verify Win</button>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h2 class="text-2xl font-semibold text-green-800 mb-4">Players (${gameState.players.length})</h2>
+              <ul class="space-y-4">
+                ${gameState.players.map(p => `
+                  <li class="bg-gray-50 p-4 rounded-lg shadow">
+                    <p class="font-semibold">${p.name}</p>
+                    <p>Tickets: ${p.tickets.length} | Balance: $${p.balance || 0} | Wins: ${p.wins || 0}</p>
+                    ${p.luckyNumbers ? `<p>Lucky Numbers: ${p.luckyNumbers.join(', ')}</p>` : ''}
+                  </li>
+                `).join('')}
+              </ul>
+            </div>
+            <div>
+              <h2 class="text-2xl font-semibold text-green-800 mb-4">Transaction History</h2>
+              <ul class="space-y-4">
+                ${gameState.transactionHistory.map((trans, index) => `
+                  <li class="bg-gray-50 p-4 rounded-lg shadow">
+                    <p class="font-semibold">Trans #${index + 1}</p>
+                    <p>Player: ${trans.playerName} | Amount: $${trans.amount} | Time: ${new Date(trans.time).toLocaleTimeString()}</p>
+                    ${trans.slipNumber ? `<p>Slip #: ${trans.slipNumber}</p>` : ''}
+                  </li>
+                `).join('')}
+              </ul>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    function generateTicketPreview() {
+      const ticket = Array(5).fill().map(() => Array(5).fill(0));
+      const numbers = [...Array(48).keys()].sort(() => Math.random() - 0.5).slice(0, 25);
+      let index = 0;
+      for (let i = 0; i < 5; i++) {
+        for (let j = 0; j < 5; j++) {
+          ticket[i][j] = numbers[index++] + 1;
+        }
+      }
+      return ticket;
+    }
+
+    function validateLuckyNumbers() {
+      const luckyNumbersInput = document.getElementById('luckyNumbers').value;
+      const numbers = luckyNumbersInput.split(',').map(num => num.trim()).filter(num => num);
+      const ticketType = document.getElementById('ticketType').value;
+      const expectedCount = parseInt(ticketType);
+
+      if (numbers.length !== expectedCount || !numbers.every(num => !isNaN(num) && num >= 1 && num <= 48)) {
+        showErrorNotification(`Please enter exactly ${expectedCount} unique numbers between 1 and 48 (e.g., 1, 2, 3, 4, 5, 6)`);
+        document.getElementById('sellBtn').disabled = true;
+        return false;
+      }
+      document.getElementById('sellBtn').disabled = false;
+      return true;
+    }
+
+    function renderTicketPreview(ticket) {
+      const previewGrid = document.getElementById('previewGrid');
+      previewGrid.innerHTML = ticket.map(row => row.map(num => `
+        <div class="ticket-cell">${num}</div>
+      `).join('')).join('');
+      
+      const luckyNumbersInput = document.getElementById('luckyNumbers').value;
+      const luckyNumbers = luckyNumbersInput.split(',').map(num => num.trim()).filter(num => num);
+      const luckyNumbersPreview = document.getElementById('luckyNumbersPreview');
+      luckyNumbersPreview.innerHTML = luckyNumbers.map(num => `
+        <div class="lucky-number-cell">${num}</div>
+      `).join('');
+      
+      document.getElementById('ticketPreview').classList.remove('hidden');
+      document.getElementById('sellBtn').disabled = !validateLuckyNumbers();
+    }
+
+    function previewTicket() {
+      const ticket = generateTicketPreview();
+      renderTicketPreview(ticket);
+    }
+
+    async function sellTicket() {
+      const playerName = document.getElementById('playerName').value;
+      const ticketType = document.getElementById('ticketType').value;
+      const ticketPrice = ticketType === '6' ? 2 : 5;
+      const luckyNumbersInput = document.getElementById('luckyNumbers').value;
+      const luckyNumbers = luckyNumbersInput.split(',').map(num => parseInt(num.trim())).filter(num => num);
+
+      if (playerName && confirm(`Confirm sale of $${ticketPrice} ${ticketType === '6' ? 'Lucky 6' : 'Lucky 7'} ticket for ${playerName}?`)) {
+        const slipNumber = Math.floor(1000 + Math.random() * 9000); // Generate a unique slip number
+        const response = await fetch('/sell-ticket', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playerName, ticketPrice, luckyNumbers, slipNumber })
+        });
+        const data = await response.json();
+        if (data.success) {
+          showNotification(`Ticket sold to ${playerName} for $${ticketPrice} with Slip #${slipNumber}!`);
+          document.getElementById('playerName').value = '';
+          document.getElementById('luckyNumbers').value = '';
+          document.getElementById('ticketPreview').classList.add('hidden');
+          document.getElementById('sellBtn').disabled = true;
+        } else {
+          showErrorNotification('Payment failed or insufficient balance!');
+        }
+      }
+    }
+
+    async function verifyWin() {
+      const verifyPlayerName = document.getElementById('verifyPlayerName').value;
+      const slipNumber = document.getElementById('slipNumber').value;
+      const player = gameState.players.find(p => p.name === verifyPlayerName && p.slipNumber === parseInt(slipNumber));
+
+      if (!player) {
+        showErrorNotification('Invalid player name or slip number!');
+        return;
+      }
+
+      const luckyNumbers = player.luckyNumbers;
+      const allDrawn = luckyNumbers.every(num => gameState.drawnBalls.includes(num));
+
+      if (allDrawn) {
+        player.balance += (luckyNumbers.length === 6 ? 50 : 100); // $50 for Lucky 6, $100 for Lucky 7
+        player.wins = (player.wins || 0) + 1;
+        showNotification(`${verifyPlayerName} wins $${luckyNumbers.length === 6 ? 50 : 100} with Slip #${slipNumber}!`);
+        socket.emit('gameState', gameState); // Update game state for all clients
+      } else {
+        showErrorNotification(`${verifyPlayerName} did not win. Missing numbers: ${luckyNumbers.filter(num => !gameState.drawnBalls.includes(num)).join(', ')}`);
+      }
+
+      document.getElementById('verifyPlayerName').value = '';
+      document.getElementById('slipNumber').value = '';
+    }
+
+    async function startGame() {
+      if (!gameState.isRunning) {
+        const response = await fetch('/start-game', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await response.json();
+        if (data.success) {
+          showNotification('Game started successfully!');
+        } else {
+          showErrorNotification('Failed to start game!');
+        }
+      }
+    }
+
+    async function stopGame() {
+      if (gameState.isRunning) {
+        const response = await fetch('/stop-game', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await response.json();
+        if (data.success) {
+          showNotification('Game stopped successfully!');
+        } else {
+          showErrorNotification('Failed to stop game!');
+        }
+      }
+    }
+
+    function showNotification(message) {
+      const notification = document.getElementById('notification');
+      notification.textContent = message;
+      notification.className = 'notification';
+      notification.style.display = 'block';
+      setTimeout(() => { notification.style.display = 'none'; }, 3000);
+    }
+
+    function showErrorNotification(message) {
+      const notification = document.getElementById('notification');
+      notification.textContent = message;
+      notification.className = 'notification error-notification';
+      notification.style.display = 'block';
+      setTimeout(() => { notification.style.display = 'none'; }, 3000);
+    }
+
+    socket.on('gameState', (newState) => {
+      gameState = newState;
+      renderCashierDashboard();
+    });
+
+    renderCashierDashboard();
+  </script>
+</body>
+</html>

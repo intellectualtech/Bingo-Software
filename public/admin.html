@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard - Professional Bingo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Poppins', sans-serif; }
+    .ticket-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+    .ticket-cell { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border: 1px solid #ccc; border-radius: 5px; font-weight: 600; }
+    .drawn { background-color: #facc15; color: #000; }
+    .notification { position: fixed; top: 20px; right: 20px; padding: 10px 20px; background-color: #34d399; color: white; border-radius: 5px; display: none; }
+  </style>
+</head>
+<body class="bg-gradient-to-r from-blue-900 to-blue-700 min-h-screen flex items-center justify-center">
+  <div id="notification" class="notification"></div>
+  <div id="app" class="w-full max-w-5xl p-8 bg-white rounded-2xl shadow-xl"></div>
+  <script>
+    const socket = io();
+    let gameState = { 
+      isRunning: false, 
+      drawnBalls: [], 
+      availableBalls: [], 
+      players: [], 
+      gameHistory: [], 
+      timer: 0, 
+      bonusBall: null,
+      winner: null 
+    };
+
+    function renderAdminDashboard() {
+      const currentGame = gameState.gameHistory.length > 0 ? gameState.gameHistory[gameState.gameHistory.length - 1] : null;
+      document.getElementById('app').innerHTML = `
+        <div class="text-center">
+          <h1 class="text-4xl font-bold text-blue-900 mb-6">Professional Bingo - Admin Dashboard</h1>
+          <div class="flex justify-center space-x-4 mb-6">
+            <button onclick="startGame()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition ${gameState.isRunning ? 'opacity-50 cursor-not-allowed' : ''}" ${gameState.isRunning ? 'disabled' : ''}>Start Game</button>
+            <button onclick="drawBall()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition ${!gameState.isRunning ? 'opacity-50 cursor-not-allowed' : ''}" ${!gameState.isRunning ? 'disabled' : ''}>Draw Ball</button>
+            <button onclick="stopGame()" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition ${!gameState.isRunning ? 'opacity-50 cursor-not-allowed' : ''}" ${!gameState.isRunning ? 'disabled' : ''}>Stop Game</button>
+            <button onclick="resetGame()" class="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition">Reset Game</button>
+          </div>
+          <div class="text-lg font-semibold text-gray-800 mb-4">
+            <span>Game Status: <span class="text-${gameState.isRunning ? 'green' : 'red'}-600">${gameState.isRunning ? 'Running' : 'Stopped'}</span></span>
+            <span class="ml-6">Next Draw: <span id="timer">${gameState.timer}s</span></span>
+          </div>
+          <div class="bg-gray-100 p-4 rounded-lg mb-6">
+            <h2 class="text-2xl font-semibold text-blue-800">Drawn Balls: ${gameState.drawnBalls.join(', ')}</h2>
+            ${gameState.bonusBall ? `<p class="text-lg text-yellow-600 font-semibold">Bonus Ball: ${gameState.bonusBall}</p>` : ''}
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h2 class="text-2xl font-semibold text-blue-800 mb-4">Players (${gameState.players.length})</h2>
+              <ul class="space-y-4">
+                ${gameState.players.map(p => `
+                  <li class="bg-gray-50 p-4 rounded-lg shadow">
+                    <p class="font-semibold">${p.name}</p>
+                    <p>Tickets: ${p.tickets.length} | Wins: ${p.wins || 0} | Balance: $${p.balance || 0}</p>
+                    ${p.tickets.length > 0 ? `
+                      <div class="mt-2">
+                        <h3 class="font-semibold">Latest Ticket:</h3>
+                        <div class="ticket-grid">
+                          ${p.tickets[p.tickets.length - 1].map(row => row.map(num => `
+                            <div class="ticket-cell ${gameState.drawnBalls.includes(num) ? 'drawn' : ''}">${num}</div>
+                          `).join('')).join('')}
+                        </div>
+                      </div>
+                    ` : ''}
+                  </li>
+                `).join('')}
+              </ul>
+            </div>
+            <div>
+              <h2 class="text-2xl font-semibold text-blue-800 mb-4">Game History</h2>
+              <ul class="space-y-4">
+                ${gameState.gameHistory.map((game, index) => `
+                  <li class="bg-gray-50 p-4 rounded-lg shadow">
+                    <p class="font-semibold">Game #${index + 1}</p>
+                    <p>Drawn Balls: ${game.drawnBalls.join(', ')}</p>
+                    <p>Winner: ${game.winner || 'None'}</p>
+                  </li>
+                `).join('')}
+              </ul>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    async function startGame() { 
+      await fetch('/start-game', { method: 'POST' }); 
+      startTimer();
+    }
+
+    async function drawBall() { 
+      await fetch('/draw-ball', { method: 'POST' }); 
+      gameState.timer = 10; // Reset timer after each draw
+    }
+
+    async function stopGame() { 
+      await fetch('/stop-game', { method: 'POST' }); 
+      clearInterval(window.timerInterval);
+    }
+
+    async function resetGame() { 
+      await fetch('/reset-game', { method: 'POST' }); 
+      clearInterval(window.timerInterval);
+    }
+
+    function startTimer() {
+      gameState.timer = 10;
+      clearInterval(window.timerInterval);
+      window.timerInterval = setInterval(() => {
+        if (gameState.timer > 0 && gameState.isRunning) {
+          gameState.timer--;
+          document.getElementById('timer').textContent = `${gameState.timer}s`;
+        } else if (gameState.timer === 0 && gameState.isRunning) {
+          drawBall();
+        }
+      }, 1000);
+    }
+
+    function showNotification(message) {
+      const notification = document.getElementById('notification');
+      notification.textContent = message;
+      notification.style.display = 'block';
+      setTimeout(() => { notification.style.display = 'none'; }, 3000);
+    }
+
+    socket.on('gameState', (newState) => {
+      gameState = newState;
+      renderAdminDashboard();
+      if (newState.winner) {
+        showNotification(`Winner: ${newState.winner}!`);
+      }
+    });
+
+    socket.on('bonusBall', (bonusBall) => {
+      gameState.bonusBall = bonusBall;
+      showNotification(`Bonus Ball Drawn: ${bonusBall}!`);
+    });
+
+    renderAdminDashboard();
+  </script>
+</body>
+</html>
