@@ -13,46 +13,159 @@
     .ticket-cell { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border: 1px solid #ccc; border-radius: 5px; font-weight: 600; }
     .drawn { background-color: #facc15; color: #000; }
     .notification { position: fixed; top: 20px; right: 20px; padding: 10px 20px; background-color: #34d399; color: white; border-radius: 5px; display: none; }
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
+    .modal-content { background: white; padding: 20px; border-radius: 10px; width: 400px; }
   </style>
 </head>
 <body class="bg-gradient-to-r from-blue-900 to-blue-700 min-h-screen flex items-center justify-center">
   <div id="notification" class="notification"></div>
-  <div id="app" class="w-full max-w-5xl p-8 bg-white rounded-2xl shadow-xl"></div>
+  <div id="app" class="w-full max-w-7xl p-8 bg-white rounded-2xl shadow-xl"></div>
+
+  <div id="modal" class="modal">
+    <div class="modal-content">
+      <h2 id="modal-title" class="text-xl font-semibold mb-4"></h2>
+      <div id="modal-body"></div>
+      <div class="mt-4 flex justify-end">
+        <button id="modal-close" class="bg-gray-500 text-white px-4 py-2 rounded mr-2">Close</button>
+        <button id="modal-submit" class="bg-blue-600 text-white px-4 py-2 rounded">Submit</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const socket = io();
-    let gameState = { 
-      isRunning: false, 
-      drawnBalls: [], 
-      availableBalls: [], 
-      players: [], 
-      gameHistory: [], 
-      timer: 0, 
+    let gameState = {
+      isRunning: false,
+      drawnBalls: [],
+      availableBalls: Array.from({ length: 75 }, (_, i) => i + 1),
+      players: [],
+      gameHistory: [],
+      timer: 10,
       bonusBall: null,
-      winner: null 
+      winner: null,
+      locations: [
+        { id: 1, name: "Main Hall", address: "123 Bingo St", maxWin: 1000, rules: { pattern: "Full Card", maxBalls: 50 } },
+        { id: 2, name: "Downtown Club", address: "456 Game Ave", maxWin: 1500, rules: { pattern: "Four Corners", maxBalls: 40 } }
+      ],
+      cashiers: [
+        { id: 1, name: "Alice Smith", locationId: 1, status: "active", activityLog: [] },
+        { id: 2, name: "Bob Johnson", locationId: 2, status: "active", activityLog: [] }
+      ],
+      screens: [
+        { id: 1, type: "Flashboard", locationId: 1, status: "online" },
+        { id: 2, type: "Flashboard", locationId: 2, status: "online" }
+      ],
+      jackpots: [
+        { id: 1, locationId: 1, bronze: 500, silver: 1000, gold: 2000, max: 5000 },
+        { id: 2, locationId: 2, bronze: 300, silver: 800, gold: 1500, max: 4000 }
+      ],
+      gameConfig: { drawInterval: 10, bonusBallEnabled: true, autoDraw: true },
+      reports: []
     };
 
     function renderAdminDashboard() {
-      const currentGame = gameState.gameHistory.length > 0 ? gameState.gameHistory[gameState.gameHistory.length - 1] : null;
+      const userRole = "admin"; // Mock admin role
       document.getElementById('app').innerHTML = `
         <div class="text-center">
           <h1 class="text-4xl font-bold text-blue-900 mb-6">Professional Bingo - Admin Dashboard</h1>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+            <div class="bg-gray-100 p-4 rounded-lg shadow">
+              <h2 class="text-xl font-semibold text-blue-800 mb-2">Manage Locations</h2>
+              <button onclick="openAddLocationModal()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Add Location</button>
+              <button onclick="openEditLocationModal()" class="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700 ml-2">Edit Location</button>
+              <ul class="mt-4 text-left">
+                ${gameState.locations.map(loc => `
+                  <li class="mb-2">
+                    ${loc.name} (${loc.address}) - Max Win: $${loc.maxWin}
+                    <button onclick="deleteLocation(${loc.id})" class="text-red-600 ml-2">Delete</button>
+                  </li>
+                `).join('')}
+              </ul>
+            </div>
+            <div class="bg-gray-100 p-4 rounded-lg shadow">
+              <h2 class="text-xl font-semibold text-blue-800 mb-2">Manage Cashiers</h2>
+              <button onclick="openAddCashierModal()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Add Cashier</button>
+              <button onclick="openAssignCashierModal()" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 ml-2">Assign</button>
+              <ul class="mt-4 text-left">
+                ${gameState.cashiers.map(c => `
+                  <li class="mb-2">
+                    ${c.name} (Location: ${gameState.locations.find(l => l.id === c.locationId)?.name || 'None'}) - ${c.status}
+                    <button onclick="viewCashierLog(${c.id})" class="text-blue-600 ml-2">Log</button>
+                    <button onclick="deleteCashier(${c.id})" class="text-red-600 ml-2">Delete</button>
+                  </li>
+                `).join('')}
+              </ul>
+            </div>
+            <div class="bg-gray-100 p-4 rounded-lg shadow">
+              <h2 class="text-xl font-semibold text-blue-800 mb-2">Manage Screens</h2>
+              <button onclick="openAddScreenModal()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Add Screen</button>
+              <ul class="mt-4 text-left">
+                ${gameState.screens.map(s => `
+                  <li class="mb-2">
+                    ${s.type} - Location: ${gameState.locations.find(l => l.id === s.locationId)?.name || 'None'} (${s.status})
+                    <button onclick="deleteScreen(${s.id})" class="text-red-600 ml-2">Delete</button>
+                  </li>
+                `).join('')}
+              </ul>
+            </div>
+            <div class="bg-gray-100 p-4 rounded-lg shadow">
+              <h2 class="text-xl font-semibold text-blue-800 mb-2">Jackpot Tiers</h2>
+              <button onclick="openEditJackpotModal()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Edit Jackpots</button>
+              <ul class="mt-4 text-left">
+                ${gameState.jackpots.map(j => `
+                  <li class="mb-2">
+                    Location ${gameState.locations.find(l => l.id === j.locationId)?.name || 'None'}: 
+                    Bronze: $${j.bronze}, Silver: $${j.silver}, Gold: $${j.gold}, Max: $${j.max}
+                  </li>
+                `).join('')}
+              </ul>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div class="bg-gray-100 p-4 rounded-lg shadow">
+              <h2 class="text-xl font-semibold text-blue-800 mb-2">Game Configuration</h2>
+              <button onclick="openGameConfigModal()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Configure Game</button>
+              <p class="mt-2">Draw Interval: ${gameState.gameConfig.drawInterval}s</p>
+              <p>Bonus Ball: ${gameState.gameConfig.bonusBallEnabled ? 'Enabled' : 'Disabled'}</p>
+              <p>Auto Draw: ${gameState.gameConfig.autoDraw ? 'Enabled' : 'Disabled'}</p>
+            </div>
+            <div class="bg-gray-100 p-4 rounded-lg shadow">
+              <h2 class="text-xl font-semibold text-blue-800 mb-2">Reports</h2>
+              <button onclick="generateReport()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Generate Report</button>
+              <ul class="mt-4 text-left">
+                ${gameState.reports.map(r => `
+                  <li class="mb-2">
+                    Report #${r.id}: ${r.type} (${r.date}) - $${r.totalRevenue}
+                    <button onclick="viewReport(${r.id})" class="text-blue-600 ml-2">View</button>
+                  </li>
+                `).join('')}
+              </ul>
+            </div>
+          </div>
+
           <div class="flex justify-center space-x-4 mb-6">
             <button onclick="startGame()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition ${gameState.isRunning ? 'opacity-50 cursor-not-allowed' : ''}" ${gameState.isRunning ? 'disabled' : ''}>Start Game</button>
             <button onclick="drawBall()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition ${!gameState.isRunning ? 'opacity-50 cursor-not-allowed' : ''}" ${!gameState.isRunning ? 'disabled' : ''}>Draw Ball</button>
             <button onclick="stopGame()" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition ${!gameState.isRunning ? 'opacity-50 cursor-not-allowed' : ''}" ${!gameState.isRunning ? 'disabled' : ''}>Stop Game</button>
             <button onclick="resetGame()" class="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition">Reset Game</button>
+            <button onclick="sendNotificationPrompt()" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition">Send Notification</button>
           </div>
+
           <div class="text-lg font-semibold text-gray-800 mb-4">
             <span>Game Status: <span class="text-${gameState.isRunning ? 'green' : 'red'}-600">${gameState.isRunning ? 'Running' : 'Stopped'}</span></span>
             <span class="ml-6">Next Draw: <span id="timer">${gameState.timer}s</span></span>
           </div>
+
           <div class="bg-gray-100 p-4 rounded-lg mb-6">
             <h2 class="text-2xl font-semibold text-blue-800">Drawn Balls: ${gameState.drawnBalls.join(', ')}</h2>
             ${gameState.bonusBall ? `<p class="text-lg text-yellow-600 font-semibold">Bonus Ball: ${gameState.bonusBall}</p>` : ''}
           </div>
+
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <h2 class="text-2xl font-semibold text-blue-800 mb-4">Players (${gameState.players.length})</h2>
+              <button onclick="openBanPlayerModal()" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 mb-4">Ban Player</button>
               <ul class="space-y-4">
                 ${gameState.players.map(p => `
                   <li class="bg-gray-50 p-4 rounded-lg shadow">
@@ -66,18 +179,19 @@
                             <div class="ticket-cell ${gameState.drawnBalls.includes(num) ? 'drawn' : ''}">${num}</div>
                           `).join('')).join('')}
                         </div>
-                      </div>
-                    ` : ''}
+                      </div>` : ''}
                   </li>
                 `).join('')}
               </ul>
             </div>
+
             <div>
               <h2 class="text-2xl font-semibold text-blue-800 mb-4">Game History</h2>
               <ul class="space-y-4">
                 ${gameState.gameHistory.map((game, index) => `
                   <li class="bg-gray-50 p-4 rounded-lg shadow">
                     <p class="font-semibold">Game #${index + 1}</p>
+                    <p>Location: ${gameState.locations.find(l => l.id === game.locationId)?.name || 'None'}</p>
                     <p>Drawn Balls: ${game.drawnBalls.join(', ')}</p>
                     <p>Winner: ${game.winner || 'None'}</p>
                   </li>
@@ -88,37 +202,435 @@
         </div>`;
     }
 
-    async function startGame() { 
-      await fetch('/start-game', { method: 'POST' }); 
+    // Modal Handling
+    function openModal(title, body, onSubmit) {
+      const modal = document.getElementById('modal');
+      document.getElementById('modal-title').textContent = title;
+      document.getElementById('modal-body').innerHTML = body;
+      document.getElementById('modal-submit').onclick = onSubmit;
+      document.getElementById('modal-close').onclick = () => modal.style.display = 'none';
+      modal.style.display = 'flex';
+    }
+
+    function openAddLocationModal() {
+      openModal('Add Location', `
+        <label class="block mb-2">Name</label>
+        <input id="loc-name" type="text" class="border p-2 rounded w-full mb-2">
+        <label class="block mb-2">Address</label>
+        <input id="loc-address" type="text" class="border p-2 rounded w-full mb-2">
+        <label class="block mb-2">Max Win ($)</label>
+        <input id="loc-max-win" type="number" class="border p-2 rounded w-full mb-2">
+        <label class="block mb-2">Winning Pattern</label>
+        <select id="loc-pattern" class="border p-2 rounded w-full">
+          <option value="Full Card">Full Card</option>
+          <option value="Four Corners">Four Corners</option>
+          <option value="Line">Line</option>
+        </select>
+        <label class="block mb-2">Max Balls</label>
+        <input id="loc-max-balls" type="number" class="border p-2 rounded w-full">
+      `, () => {
+        const name = document.getElementById('loc-name').value;
+        const address = document.getElementById('loc-address').value;
+        const maxWin = Number(document.getElementById('loc-max-win').value);
+        const pattern = document.getElementById('loc-pattern').value;
+        const maxBalls = Number(document.getElementById('loc-max-balls').value);
+        addLocation({ name, address, maxWin, rules: { pattern, maxBalls } });
+        document.getElementById('modal').style.display = 'none';
+      });
+    }
+
+    function openEditLocationModal() {
+      openModal('Edit Location', `
+        <label class="block mb-2">Select Location</label>
+        <select id="loc-id" class="border p-2 rounded w-full mb-2">
+          ${gameState.locations.map(l => `<option value="${l.id}">${l.name}</option>`).join('')}
+        </select>
+        <label class="block mb-2">Name</label>
+        <input id="loc-name" type="text" class="border p-2 rounded w-full mb-2">
+        <label class="block mb-2">Address</label>
+        <input id="loc-address" type="text" class="border p-2 rounded w-full mb-2">
+        <label class="block mb-2">Max Win ($)</label>
+        <input id="loc-max-win" type="number" class="border p-2 rounded w-full mb-2">
+        <label class="block mb-2">Winning Pattern</label>
+        <select id="loc-pattern" class="border p-2 rounded w-full">
+          <option value="Full Card">Full Card</option>
+          <option value="Four Corners">Four Corners</option>
+          <option value="Line">Line</option>
+        </select>
+        <label class="block mb-2">Max Balls</label>
+        <input id="loc-max-balls" type="number" class="border p-2 rounded w-full">
+      `, () => {
+        const id = Number(document.getElementById('loc-id').value);
+        const name = document.getElementById('loc-name').value;
+        const address = document.getElementById('loc-address').value;
+        const maxWin = Number(document.getElementById('loc-max-win').value);
+        const pattern = document.getElementById('loc-pattern').value;
+        const maxBalls = Number(document.getElementById('loc-max-balls').value);
+        editLocation(id, { name, address, maxWin, rules: { pattern, maxBalls } });
+        document.getElementById('modal').style.display = 'none';
+      });
+    }
+
+    function openAddCashierModal() {
+      openModal('Add Cashier', `
+        <label class="block mb-2">Name</label>
+        <input id="cashier-name" type="text" class="border p-2 rounded w-full mb-2">
+        <label class="block mb-2">Location</label>
+        <select id="cashier-location" class="border p-2 rounded w-full">
+          <option value="">None</option>
+          ${gameState.locations.map(l => `<option value="${l.id}">${l.name}</option>`).join('')}
+        </select>
+      `, () => {
+        const name = document.getElementById('cashier-name').value;
+        const locationId = Number(document.getElementById('cashier-location').value) || null;
+        addCashier({ name, locationId });
+        document.getElementById('modal').style.display = 'none';
+      });
+    }
+
+    function openAssignCashierModal() {
+      openModal('Assign Cashier', `
+        <label class="block mb-2">Select Cashier</label>
+        <select id="cashier-id" class="border p-2 rounded w-full mb-2">
+          ${gameState.cashiers.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
+        </select>
+        <label class="block mb-2">Location</label>
+        <select id="cashier-location" class="border p-2 rounded w-full">
+          <option value="">None</option>
+          ${gameState.locations.map(l => `<option value="${l.id}">${l.name}</option>`).join('')}
+        </select>
+      `, () => {
+        const cashierId = Number(document.getElementById('cashier-id').value);
+        const locationId = Number(document.getElementById('cashier-location').value) || null;
+        assignCashier(cashierId, locationId);
+        document.getElementById('modal').style.display = 'none';
+      });
+    }
+
+    function openAddScreenModal() {
+      openModal('Add Display Screen', `
+        <label class="block mb-2">Type</label>
+        <select id="screen-type" class="border p-2 rounded w-full mb-2">
+          <option value="Flashboard">Flashboard</option>
+          <option value="Info Display">Info Display</option>
+        </select>
+        <label class="block mb-2">Location</label>
+        <select id="screen-location" class="border p-2 rounded w-full">
+          ${gameState.locations.map(l => `<option value="${l.id}">${l.name}</option>`).join('')}
+        </select>
+      `, () => {
+        const type = document.getElementById('screen-type').value;
+        const locationId = Number(document.getElementById('screen-location').value);
+        addScreen({ type, locationId });
+        document.getElementById('modal').style.display = 'none';
+      });
+    }
+
+    function openEditJackpotModal() {
+      openModal('Edit Jackpot Tiers', `
+        <label class="block mb-2">Select Location</label>
+        <select id="jackpot-location" class="border p-2 rounded w-full mb-2">
+          ${gameState.locations.map(l => `<option value="${l.id}">${l.name}</option>`).join('')}
+        </select>
+        <label class="block mb-2">Bronze ($)</label>
+        <input id="jackpot-bronze" type="number" class="border p-2 rounded w-full mb-2">
+        <label class="block mb-2">Silver ($)</label>
+        <input id="jackpot-silver" type="number" class="border p-2 rounded w-full mb-2">
+        <label class="block mb-2">Gold ($)</label>
+        <input id="jackpot-gold" type="number" class="border p-2 rounded w-full mb-2">
+        <label class="block mb-2">Max ($)</label>
+        <input id="jackpot-max" type="number" class="border p-2 rounded w-full">
+      `, () => {
+        const locationId = Number(document.getElementById('jackpot-location').value);
+        const bronze = Number(document.getElementById('jackpot-bronze').value);
+        const silver = Number(document.getElementById('jackpot-silver').value);
+        const gold = Number(document.getElementById('jackpot-gold').value);
+        const max = Number(document.getElementById('jackpot-max').value);
+        editJackpot(locationId, { bronze, silver, gold, max });
+        document.getElementById('modal').style.display = 'none';
+      });
+    }
+
+    function openGameConfigModal() {
+      openModal('Configure Game', `
+        <label class="block mb-2">Draw Interval (seconds)</label>
+        <input id="game-draw-interval" type="number" value="${gameState.gameConfig.drawInterval}" class="border p-2 rounded w-full mb-2">
+        <label class="block mb-2">Bonus Ball</label>
+        <input id="game-bonus-ball" type="checkbox" ${gameState.gameConfig.bonusBallEnabled ? 'checked' : ''} class="mb-2">
+        <label class="block mb-2">Auto Draw</label>
+        <input id="game-auto-draw" type="checkbox" ${gameState.gameConfig.autoDraw ? 'checked' : ''}>
+      `, () => {
+        const drawInterval = Number(document.getElementById('game-draw-interval').value);
+        const bonusBallEnabled = document.getElementById('game-bonus-ball').checked;
+        const autoDraw = document.getElementById('game-auto-draw').checked;
+        updateGameConfig({ drawInterval, bonusBallEnabled, autoDraw });
+        document.getElementById('modal').style.display = 'none';
+      });
+    }
+
+    function openBanPlayerModal() {
+      openModal('Ban Player', `
+        <label class="block mb-2">Select Player</label>
+        <select id="player-id" class="border p-2 rounded w-full">
+          ${gameState.players.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
+        </select>
+      `, () => {
+        const playerId = Number(document.getElementById('player-id').value);
+        banPlayer(playerId);
+        document.getElementById('modal').style.display = 'none';
+      });
+    }
+
+    function sendNotificationPrompt() {
+      openModal('Send Notification', `
+        <label class="block mb-2">Message</label>
+        <textarea id="notification-message" class="border p-2 rounded w-full"></textarea>
+        <label class="block mb-2">Target</label>
+        <select id="notification-target" class="border p-2 rounded w-full">
+          <option value="all">All Users</option>
+          <option value="players">Players</option>
+          <option value="cashiers">Cashiers</option>
+        </select>
+      `, () => {
+        const message = document.getElementById('notification-message').value;
+        const target = document.getElementById('notification-target').value;
+        sendNotification(message, target);
+        document.getElementById('modal').style.display = 'none';
+      });
+    }
+
+    // Admin Actions
+    async function addLocation(location) {
+      const newLocation = { id: gameState.locations.length + 1, ...location };
+      gameState.locations.push(newLocation);
+      await fetch('/api/locations', { method: 'POST', body: JSON.stringify(newLocation), headers: { 'Content-Type': 'application/json' } });
+      renderAdminDashboard();
+      showNotification(`Location ${location.name} added!`);
+    }
+
+    async function editLocation(id, updates) {
+      gameState.locations = gameState.locations.map(l => l.id === id ? { ...l, ...updates } : l);
+      await fetch(`/api/locations/${id}`, { method: 'PUT', body: JSON.stringify(updates), headers: { 'Content-Type': 'application/json' } });
+      renderAdminDashboard();
+      showNotification(`Location updated!`);
+    }
+
+    async function deleteLocation(id) {
+      gameState.locations = gameState.locations.filter(l => l.id !== id);
+      gameState.cashiers = gameState.cashiers.map(c => c.locationId === id ? { ...c, locationId: null } : c);
+      gameState.screens = gameState.screens.filter(s => s.locationId !== id);
+      gameState.jackpots = gameState.jackpots.filter(j => j.locationId !== id);
+      await fetch(`/api/locations/${id}`, { method: 'DELETE' });
+      renderAdminDashboard();
+      showNotification(`Location deleted!`);
+    }
+
+    async function addCashier(cashier) {
+      const newCashier = { id: gameState.cashiers.length + 1, status: 'active', activityLog: [], ...cashier };
+      gameState.cashiers.push(newCashier);
+      await fetch('/api/cashiers', { method: 'POST', body: JSON.stringify(newCashier), headers: { 'Content-Type': 'application/json' } });
+      renderAdminDashboard();
+      showNotification(`Cashier ${cashier.name} added!`);
+    }
+
+    async function assignCashier(cashierId, locationId) {
+      gameState.cashiers = gameState.cashiers.map(c => c.id === cashierId ? { ...c, locationId, activityLog: [...c.activityLog, `Assigned to Location ${locationId} at ${new Date().toISOString()}`] } : c);
+      await fetch(`/api/cashiers/${cashierId}`, { method: 'PUT', body: JSON.stringify({ locationId }), headers: { 'Content-Type': 'application/json' } });
+      renderAdminDashboard();
+      showNotification(`Cashier assigned!`);
+    }
+
+    async function deleteCashier(id) {
+      gameState.cashiers = gameState.cashiers.filter(c => c.id !== id);
+      await fetch(`/api/cashiers/${id}`, { method: 'DELETE' });
+      renderAdminDashboard();
+      showNotification(`Cashier deleted!`);
+    }
+
+    function viewCashierLog(id) {
+      const cashier = gameState.cashiers.find(c => c.id === id);
+      openModal(`Activity Log for ${cashier.name}`, `
+        <ul class="text-left">
+          ${cashier.activityLog.map(log => `<li>${log}</li>`).join('')}
+        </ul>
+      `, () => document.getElementById('modal').style.display = 'none');
+    }
+
+    async function addScreen(screen) {
+      const newScreen = { id: gameState.screens.length + 1, status: 'online', ...screen };
+      gameState.screens.push(newScreen);
+      await fetch('/api/screens', { method: 'POST', body: JSON.stringify(newScreen), headers: { 'Content-Type': 'application/json' } });
+      renderAdminDashboard();
+      showNotification(`Screen added!`);
+    }
+
+    async function deleteScreen(id) {
+      gameState.screens = gameState.screens.filter(s => s.id !== id);
+      await fetch(`/api/screens/${id}`, { method: 'DELETE' });
+      renderAdminDashboard();
+      showNotification(`Screen deleted!`);
+    }
+
+    async function editJackpot(locationId, updates) {
+      const existing = gameState.jackpots.find(j => j.locationId === locationId);
+      if (existing) {
+        gameState.jackpots = gameState.jackpots.map(j => j.locationId === locationId ? { ...j, ...updates } : j);
+        await fetch(`/api/jackpots/${existing.id}`, { method: 'PUT', body: JSON.stringify(updates), headers: { 'Content-Type': 'application/json' } });
+      } else {
+        const newJackpot = { id: gameState.jackpots.length + 1, locationId, ...updates };
+        gameState.jackpots.push(newJackpot);
+        await fetch('/api/jackpots', { method: 'POST', body: JSON.stringify(newJackpot), headers: { 'Content-Type': 'application/json' } });
+      }
+      renderAdminDashboard();
+      showNotification(`Jackpot updated!`);
+    }
+
+    async function updateGameConfig(config) {
+      gameState.gameConfig = { ...gameState.gameConfig, ...config };
+      gameState.timer = config.drawInterval;
+      await fetch('/api/game-config', { method: 'PUT', body: JSON.stringify(config), headers: { 'Content-Type': 'application/json' } });
+      renderAdminDashboard();
+      showNotification(`Game configuration updated!`);
+    }
+
+    async function banPlayer(playerId) {
+      gameState.players = gameState.players.map(p => p.id === playerId ? { ...p, status: 'banned' } : p);
+      await fetch(`/api/players/${playerId}`, { method: 'PUT', body: JSON.stringify({ status: 'banned' }), headers: { 'Content-Type': 'application/json' } });
+      renderAdminDashboard();
+      showNotification(`Player banned!`);
+    }
+
+    async function generateReport() {
+      const report = {
+        id: gameState.reports.length + 1,
+        type: 'Game Summary',
+        date: new Date().toISOString(),
+        totalRevenue: gameState.players.reduce((sum, p) => sum + (p.tickets.length * 10), 0),
+        totalTickets: gameState.players.reduce((sum, p) => sum + p.tickets.length, 0),
+        winners: gameState.gameHistory.filter(g => g.winner).map(g => g.winner)
+      };
+      gameState.reports.push(report);
+      await fetch('/api/reports', { method: 'POST', body: JSON.stringify(report), headers: { 'Content-Type': 'application/json' } });
+      renderAdminDashboard();
+      showNotification(`Report generated!`);
+    }
+
+    function viewReport(id) {
+      const report = gameState.reports.find(r => r.id === id);
+      openReportModal(report);
+    }
+
+    function openReportModal(report) {
+      openModal(`Report #${report.id}`, `
+        <p>Type: ${report.type}</p>
+        <p>Date: ${report.date}</p>
+        <p>Total Revenue: $${report.totalRevenue}</p>
+        <p>Total Tickets: ${report.totalTickets}</p>
+        <p>Winners: ${report.winners.join(', ') || 'None'}</p>
+      `, () => document.getElementById('modal').style.display = 'none');
+    }
+
+    async function sendNotification(message, target) {
+      await fetch('/api/notifications', { method: 'POST', body: JSON.stringify({ message, target }), headers: { 'Content-Type': 'application/json' } });
+      socket.emit('notification', { message, target });
+      showNotification(`Notification sent to ${target}!`);
+    }
+
+    async function startGame() {
+      gameState.isRunning = true;
+      gameState.drawnBalls = [];
+      gameState.availableBalls = Array.from({ length: 75 }, (_, i) => i + 1);
+      gameState.bonusBall = null;
+      gameState.winner = null;
+      await fetch('/api/start-game', { method: 'POST', body: JSON.stringify({ locationId: 1 }), headers: { 'Content-Type': 'application/json' } });
+      socket.emit('gameState', gameState);
       startTimer();
+      renderAdminDashboard();
+      showNotification('Game started!');
     }
 
-    async function drawBall() { 
-      await fetch('/draw-ball', { method: 'POST' }); 
-      gameState.timer = 10; // Reset timer after each draw
+    async function drawBall() {
+      if (gameState.availableBalls.length === 0) return;
+      const ball = gameState.availableBalls.splice(Math.floor(Math.random() * gameState.availableBalls.length), 1)[0];
+      gameState.drawnBalls.push(ball);
+      if (gameState.gameConfig.bonusBallEnabled && gameState.drawnBalls.length === gameState.locations.find(l => l.id === 1).rules.maxBalls) {
+        gameState.bonusBall = ball;
+        socket.emit('bonusBall', ball);
+      }
+      await fetch('/api/draw-ball', { method: 'POST', body: JSON.stringify({ ball }), headers: { 'Content-Type': 'application/json' } });
+      socket.emit('gameState', gameState);
+      gameState.timer = gameState.gameConfig.drawInterval;
+      checkForWinner();
+      renderAdminDashboard();
     }
 
-    async function stopGame() { 
-      await fetch('/stop-game', { method: 'POST' }); 
+    async function stopGame() {
+      gameState.isRunning = false;
+      gameState.gameHistory.push({
+        locationId: 1,
+        drawnBalls: [...gameState.drawnBalls],
+        winner: gameState.winner,
+        timestamp: new Date().toISOString()
+      });
+      await fetch('/api/stop-game', { method: 'POST', body: JSON.stringify(gameState), headers: { 'Content-Type': 'application/json' } });
+      socket.emit('gameState', gameState);
       clearInterval(window.timerInterval);
+      renderAdminDashboard();
+      showNotification('Game stopped!');
     }
 
-    async function resetGame() { 
-      await fetch('/reset-game', { method: 'POST' }); 
+    async function resetGame() {
+      gameState.isRunning = false;
+      gameState.drawnBalls = [];
+      gameState.availableBalls = Array.from({ length: 75 }, (_, i) => i + 1);
+      gameState.bonusBall = null;
+      gameState.winner = null;
+      await fetch('/api/reset-game', { method: 'POST' });
+      socket.emit('gameState', gameState);
       clearInterval(window.timerInterval);
+      renderAdminDashboard();
+      showNotification('Game reset!');
     }
 
     function startTimer() {
-      gameState.timer = 10;
+      gameState.timer = gameState.gameConfig.drawInterval;
       clearInterval(window.timerInterval);
       window.timerInterval = setInterval(() => {
         if (gameState.timer > 0 && gameState.isRunning) {
           gameState.timer--;
           document.getElementById('timer').textContent = `${gameState.timer}s`;
-        } else if (gameState.timer === 0 && gameState.isRunning) {
+        } else if (gameState.timer === 0 && gameState.isRunning && gameState.gameConfig.autoDraw) {
           drawBall();
         }
       }, 1000);
+    }
+
+    function checkForWinner() {
+      const location = gameState.locations.find(l => l.id === 1); // Mock location
+      gameState.players.forEach(player => {
+        player.tickets.forEach(ticket => {
+          const isWinner = checkWinningPattern(ticket, location.rules.pattern);
+          if (isWinner) {
+            gameState.winner = player.name;
+            socket.emit('gameState', gameState);
+            showNotification(`Winner: ${player.name}!`);
+          }
+        });
+      });
+    }
+
+    function checkWinningPattern(ticket, pattern) {
+      const flatTicket = ticket.flat();
+      switch (pattern) {
+        case 'Full Card':
+          return flatTicket.every(num => gameState.drawnBalls.includes(num));
+        case 'Four Corners':
+          return [ticket[0][0], ticket[0][4], ticket[4][0], ticket[4][4]].every(num => gameState.drawnBalls.includes(num));
+        case 'Line':
+          return ticket.some(row => row.every(num => gameState.drawnBalls.includes(num)));
+        default:
+          return false;
+      }
     }
 
     function showNotification(message) {
@@ -139,6 +651,12 @@
     socket.on('bonusBall', (bonusBall) => {
       gameState.bonusBall = bonusBall;
       showNotification(`Bonus Ball Drawn: ${bonusBall}!`);
+    });
+
+    socket.on('notification', ({ message, target }) => {
+      if (target === 'all' || target === 'admins') {
+        showNotification(message);
+      }
     });
 
     renderAdminDashboard();
