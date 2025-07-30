@@ -3,663 +3,1698 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin Dashboard - Professional Bingo</title>
+  <title>Bingo Operations Center - Admin Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
   <style>
-    body { font-family: 'Poppins', sans-serif; }
-    .ticket-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
-    .ticket-cell { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border: 1px solid #ccc; border-radius: 5px; font-weight: 600; }
-    .drawn { background-color: #facc15; color: #000; }
-    .notification { position: fixed; top: 20px; right: 20px; padding: 10px 20px; background-color: #34d399; color: white; border-radius: 5px; display: none; }
-    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
-    .modal-content { background: white; padding: 20px; border-radius: 10px; width: 400px; }
+    * {
+      box-sizing: border-box;
+    }
+    
+    body { 
+      font-family: 'Inter', sans-serif; 
+      background: linear-gradient(135deg, #f5cba7 0%, #d5d5d5 100%);
+      min-height: 100vh;
+    }
+    
+    .glass-morphism {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(20px);
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    }
+    
+    .card-elevated {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(20px);
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .card-elevated:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 32px 64px rgba(0, 0, 0, 0.15);
+    }
+    
+    .sidebar {
+      background: linear-gradient(180deg, #797d7f 0%, #626567 100%);
+      backdrop-filter: blur(20px);
+      border-right: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 4px 0 20px rgba(0, 0, 0, 0.1);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .nav-item {
+      position: relative;
+      margin: 8px 16px;
+      padding: 16px 20px;
+      border-radius: 12px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 500;
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.8);
+    }
+    
+    .nav-item:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+      transform: translateX(4px);
+    }
+    
+    .nav-item.active {
+      background: linear-gradient(135deg, #f4a261 0%, #e76f51 100%);
+      color: white;
+      box-shadow: 0 8px 16px rgba(244, 162, 97, 0.3);
+    }
+    
+    .nav-item.active::before {
+      content: '';
+      position: absolute;
+      left: -16px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 4px;
+      height: 24px;
+      background: #f4a261;
+      border-radius: 2px;
+    }
+    
+    .metric-card {
+      background: linear-gradient(135deg, #ffffff 0%, #f8f1e9 100%);
+      border-radius: 16px;
+      padding: 24px;
+      border: 1px solid rgba(0, 0, 0, 0.05);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .metric-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #f4a261, #e76f51, #f4a261);
+    }
+    
+    .metric-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+    }
+    
+    .metric-value {
+      font-size: 2rem;
+      font-weight: 800;
+      color: #2d3436;
+      margin-bottom: 4px;
+    }
+    
+    .metric-label {
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: #636e72;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    
+    .metric-change {
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-top: 8px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      display: inline-block;
+    }
+    
+    .metric-change.positive {
+      background: rgba(46, 204, 113, 0.1);
+      color: #27ae60;
+    }
+    
+    .metric-change.negative {
+      background: rgba(231, 76, 60, 0.1);
+      color: #c0392b;
+    }
+    
+    .btn {
+      padding: 12px 24px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 14px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .btn::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.3);
+      transition: all 0.5s;
+      transform: translate(-50%, -50%);
+    }
+    
+    .btn:hover::before {
+      width: 300px;
+      height: 300px;
+    }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, #f4a261 0%, #e76f51 100%);
+      color: white;
+      box-shadow: 0 4px 16px rgba(244, 162, 97, 0.3);
+    }
+    
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(244, 162, 97, 0.4);
+    }
+    
+    .btn-success {
+      background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+      color: white;
+      box-shadow: 0 4px 16px rgba(46, 204, 113, 0.3);
+    }
+    
+    .btn-warning {
+      background: linear-gradient(135deg, #f1c40f 0%, #e67e22 100%);
+      color: white;
+      box-shadow: 0 4px 16px rgba(241, 196, 15, 0.3);
+    }
+    
+    .btn-danger {
+      background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+      color: white;
+      box-shadow: 0 4px 16px rgba(231, 76, 60, 0.3);
+    }
+    
+    .btn-secondary {
+      background: linear-gradient(135deg, #b2bec3 0%, #95a5a6 100%);
+      color: white;
+      box-shadow: 0 4px 16px rgba(178, 190, 195, 0.3);
+    }
+    
+    .ticket-grid { 
+      display: grid; 
+      grid-template-columns: repeat(5, 1fr); 
+      gap: 8px; 
+      max-width: 250px;
+    }
+    
+    .ticket-cell { 
+      width: 40px; 
+      height: 40px; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+      border: 2px solid #dfe6e9;
+      border-radius: 8px; 
+      font-weight: 700;
+      font-size: 14px;
+      background: white;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .ticket-cell.drawn { 
+      background: linear-gradient(135deg, #f4a261 0%, #e76f51 100%);
+      color: #2d3436;
+      border-color: #e76f51;
+      transform: scale(1.1);
+      box-shadow: 0 4px 12px rgba(244, 162, 97, 0.3);
+    }
+    
+    .notification {
+      position: fixed;
+      top: 24px;
+      right: 24px;
+      padding: 16px 24px;
+      background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+      color: white;
+      border-radius: 12px;
+      display: none;
+      z-index: 1000;
+      box-shadow: 0 8px 32px rgba(46, 204, 113, 0.3);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      font-weight: 600;
+      animation: slideInRight 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    @keyframes slideInRight {
+      from {
+        transform: translateX(100px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+    
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(8px);
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      animation: fadeIn 0.3s ease-out;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    .modal-content {
+      background: white;
+      padding: 32px;
+      border-radius: 20px;
+      width: 90%;
+      max-width: 500px;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 32px 64px rgba(0, 0, 0, 0.2);
+      animation: slideInUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    @keyframes slideInUp {
+      from {
+        transform: translateY(30px);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+    
+    .form-input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #dfe6e9;
+      border-radius: 12px;
+      font-size: 14px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      background: #f8f1e9;
+    }
+    
+    .form-input:focus {
+      outline: none;
+      border-color: #f4a261;
+      background: white;
+      box-shadow: 0 0 0 4px rgba(244, 162, 97, 0.1);
+    }
+    
+    .form-label {
+      display: block;
+      font-size: 14px;
+      font-weight: 600;
+      color: #2d3436;
+      margin-bottom: 8px;
+    }
+    
+    .status-badge {
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    
+    .status-active {
+      background: rgba(46, 204, 113, 0.1);
+      color: #27ae60;
+      border: 1px solid rgba(46, 204, 113, 0.2);
+    }
+    
+    .status-inactive {
+      background: rgba(231, 76, 60, 0.1);
+      color: #c0392b;
+      border: 1px solid rgba(231, 76, 60, 0.2);
+    }
+    
+    .status-running {
+      background: rgba(46, 204, 113, 0.1);
+      color: #27ae60;
+      border: 1px solid rgba(46, 204, 113, 0.2);
+    }
+    
+    .status-stopped {
+      background: rgba(149, 165, 166, 0.1);
+      color: #7f8c8d;
+      border: 1px solid rgba(149, 165, 166, 0.2);
+    }
+    
+    .status-collected {
+      background: rgba(52, 152, 219, 0.1);
+      color: #2980b9;
+      border: 1px solid rgba(52, 152, 219, 0.2);
+    }
+    
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    }
+    
+    .data-table th {
+      background: linear-gradient(135deg, #f8f1e9 0%, #dfe6e9 100%);
+      padding: 16px;
+      text-align: left;
+      font-weight: 600;
+      color: #2d3436;
+      border-bottom: 1px solid #dfe6e9;
+    }
+    
+    .data-table td {
+      padding: 16px;
+      border-bottom: 1px solid #f8f1e9;
+      color: #636e72;
+    }
+    
+    .data-table tr:hover {
+      background: #f8f1e9;
+    }
+    
+    .header-actions {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+    
+    .search-box {
+      position: relative;
+      max-width: 300px;
+    }
+    
+    .search-box input {
+      padding: 12px 16px 12px 44px;
+      border: 2px solid #dfe6e9;
+      border-radius: 12px;
+      width: 100%;
+      background: rgba(255, 255, 255, 0.9);
+      backdrop-filter: blur(10px);
+    }
+    
+    .search-box i {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #b2bec3;
+    }
+    
+    .sidebar.collapsed {
+      width: 80px;
+    }
+    
+    .sidebar.collapsed .nav-text {
+      display: none;
+    }
+    
+    .main-content {
+      margin-left: 280px;
+      padding: 32px;
+      transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      min-height: 100vh;
+    }
+    
+    .main-content.collapsed {
+      margin-left: 80px;
+    }
+    
+    .page-header {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(20px);
+      border-radius: 20px;
+      padding: 32px;
+      margin-bottom: 32px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .page-title {
+      font-size: 2rem;
+      font-weight: 800;
+      color: white;
+      margin-bottom: 8px;
+    }
+    
+    .page-subtitle {
+      color: rgba(255, 255, 255, 0.8);
+      font-size: 1rem;
+    }
+    
+    @media (max-width: 768px) {
+      .sidebar {
+        position: fixed;
+        transform: translateX(-100%);
+        z-index: 999;
+        width: 280px;
+      }
+      
+      .sidebar.open {
+        transform: translateX(0);
+      }
+      
+      .main-content {
+        margin-left: 0;
+        padding: 20px;
+      }
+      
+      .main-content.collapsed {
+        margin-left: 0;
+      }
+      
+      .metric-card {
+        padding: 20px;
+      }
+      
+      .page-header {
+        padding: 24px;
+      }
+      
+      .page-title {
+        font-size: 1.5rem;
+      }
+    }
+    
+    .loading-spinner {
+      border: 3px solid rgba(244, 162, 97, 0.3);
+      border-radius: 50%;
+      border-top: 3px solid #f4a261;
+      width: 24px;
+      height: 24px;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .progress-bar {
+      width: 100%;
+      height: 8px;
+      background: #dfe6e9;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #f4a261, #e76f51);
+      border-radius: 4px;
+      transition: width 0.3s ease;
+    }
+
+    .table-container {
+      max-height: 500px;
+      overflow-y: auto;
+      border-radius: 12px;
+    }
   </style>
 </head>
-<body class="bg-gradient-to-r from-blue-900 to-blue-700 min-h-screen flex items-center justify-center">
+<body class="min-h-screen">
   <div id="notification" class="notification"></div>
-  <div id="app" class="w-full max-w-7xl p-8 bg-white rounded-2xl shadow-xl"></div>
+  
+  <!-- Sidebar -->
+  <div id="sidebar" class="sidebar fixed top-0 left-0 h-full w-70 z-50">
+    <div class="p-6 border-b border-white/20">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 bg-gradient-to-br from-orange-300 to-grey-600 rounded-xl flex items-center justify-center">
+          <i class="fas fa-dice text-white font-bold"></i>
+        </div>
+        <div class="nav-text">
+          <h2 class="text-xl font-bold text-white">Operations</h2>
+          <p class="text-orange-200 text-sm">Control Center</p>
+        </div>
+      </div>
+    </div>
+    
+    <nav class="mt-6">
+      <div class="nav-item active" onclick="navigate('dashboard')">
+        <i class="fas fa-chart-line w-5"></i>
+        <span class="nav-text">Dashboard</span>
+      </div>
+      <div class="nav-item" onclick="navigate('locations')">
+        <i class="fas fa-map-marker-alt w-5"></i>
+        <span class="nav-text">Locations</span>
+      </div>
+      <div class="nav-item" onclick="navigate('users')">
+        <i class="fas fa-user-shield w-5"></i>
+        <span class="nav-text">Users</span>
+      </div>
+      <div class="nav-item" onclick="navigate('cashiers')">
+        <i class="fas fa-users w-5"></i>
+        <span class="nav-text">Cashiers</span>
+      </div>
+      <div class="nav-item" onclick="navigate('screens')">
+        <i class="fas fa-desktop w-5"></i>
+        <span class="nav-text">Display Screens</span>
+      </div>
+      <div class="nav-item" onclick="navigate('jackpots')">
+        <i class="fas fa-trophy w-5"></i>
+        <span class="nav-text">Jackpot Tiers</span>
+      </div>
+      <div class="nav-item" onclick="navigate('financials')">
+        <i class="fas fa-dollar-sign w-5"></i>
+        <span class="nav-text">Financials</span>
+      </div>
+      <div class="nav-item" onclick="navigate('game-config')">
+        <i class="fas fa-cog w-5"></i>
+        <span class="nav-text">Game Settings</span>
+      </div>
+      <div class="nav-item" onclick="navigate('reports')">
+        <i class="fas fa-file-alt w-5"></i>
+        <span class="nav-text">Reports</span>
+      </div>
+      <div class="nav-item" onclick="navigate('error-logs')">
+        <i class="fas fa-exclamation-circle w-5"></i>
+        <span class="nav-text">Error Logs</span>
+      </div>
+      <div class="nav-item" onclick="navigate('game-history')">
+        <i class="fas fa-history w-5"></i>
+        <span class="nav-text">Game History</span>
+      </div>
+      <div class="nav-item" onclick="navigate('controls')">
+        <i class="fas fa-play-circle w-5"></i>
+        <span class="nav-text">Game Controls</span>
+      </div>
+    </nav>
+  </div>
 
+  <!-- Main Content -->
+  <div id="main-content" class="main-content">
+    <div class="page-header">
+      <div class="flex justify-between items-center">
+        <div>
+          <h1 class="page-title">Bingo Operations Center</h1>
+          <p class="page-subtitle">Professional gaming management platform</p>
+        </div>
+        <div class="header-actions">
+          <div class="search-box">
+            <i class="fas fa-search"></i>
+            <input type="text" placeholder="Search..." class="form-input">
+          </div>
+          <button id="toggle-sidebar" class="btn btn-secondary">
+            <i class="fas fa-bars"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <div id="content"></div>
+  </div>
+
+  <!-- Modal -->
   <div id="modal" class="modal">
     <div class="modal-content">
-      <h2 id="modal-title" class="text-xl font-semibold mb-4"></h2>
+      <div class="flex justify-between items-center mb-6">
+        <h2 id="modal-title" class="text-2xl font-bold text-gray-900"></h2>
+        <button id="modal-close" class="text-gray-400 hover:text-gray-600 text-xl">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
       <div id="modal-body"></div>
-      <div class="mt-4 flex justify-end">
-        <button id="modal-close" class="bg-gray-500 text-white px-4 py-2 rounded mr-2">Close</button>
-        <button id="modal-submit" class="bg-blue-600 text-white px-4 py-2 rounded">Submit</button>
+      <div class="flex justify-end gap-3 mt-8">
+        <button id="modal-close-btn" class="btn btn-secondary">
+          <i class="fas fa-times mr-2"></i>Cancel
+        </button>
+        <button id="modal-submit" class="btn btn-primary">
+          <i class="fas fa-check mr-2"></i>Confirm
+        </button>
       </div>
     </div>
   </div>
 
   <script>
-    const socket = io();
-    let gameState = {
-      isRunning: false,
-      drawnBalls: [],
-      availableBalls: Array.from({ length: 75 }, (_, i) => i + 1),
-      players: [],
-      gameHistory: [],
-      timer: 10,
-      bonusBall: null,
-      winner: null,
-      locations: [
-        { id: 1, name: "Main Hall", address: "123 Bingo St", maxWin: 1000, rules: { pattern: "Full Card", maxBalls: 50 } },
-        { id: 2, name: "Downtown Club", address: "456 Game Ave", maxWin: 1500, rules: { pattern: "Four Corners", maxBalls: 40 } }
-      ],
-      cashiers: [
-        { id: 1, name: "Alice Smith", locationId: 1, status: "active", activityLog: [] },
-        { id: 2, name: "Bob Johnson", locationId: 2, status: "active", activityLog: [] }
-      ],
-      screens: [
-        { id: 1, type: "Flashboard", locationId: 1, status: "online" },
-        { id: 2, type: "Flashboard", locationId: 2, status: "online" }
-      ],
-      jackpots: [
-        { id: 1, locationId: 1, bronze: 500, silver: 1000, gold: 2000, max: 5000 },
-        { id: 2, locationId: 2, bronze: 300, silver: 800, gold: 1500, max: 4000 }
-      ],
-      gameConfig: { drawInterval: 10, bonusBallEnabled: true, autoDraw: true },
-      reports: []
-    };
+let socket;
+let token = localStorage.getItem('token') || prompt('Enter your admin token:');
+localStorage.setItem('token', token);
+let currentState = null; // Store the current game state for access in modals
 
-    function renderAdminDashboard() {
-      const userRole = "admin"; // Mock admin role
-      document.getElementById('app').innerHTML = `
-        <div class="text-center">
-          <h1 class="text-4xl font-bold text-blue-900 mb-6">Professional Bingo - Admin Dashboard</h1>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-            <div class="bg-gray-100 p-4 rounded-lg shadow">
-              <h2 class="text-xl font-semibold text-blue-800 mb-2">Manage Locations</h2>
-              <button onclick="openAddLocationModal()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Add Location</button>
-              <button onclick="openEditLocationModal()" class="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700 ml-2">Edit Location</button>
-              <ul class="mt-4 text-left">
-                ${gameState.locations.map(loc => `
-                  <li class="mb-2">
-                    ${loc.name} (${loc.address}) - Max Win: $${loc.maxWin}
-                    <button onclick="deleteLocation(${loc.id})" class="text-red-600 ml-2">Delete</button>
-                  </li>
-                `).join('')}
-              </ul>
-            </div>
-            <div class="bg-gray-100 p-4 rounded-lg shadow">
-              <h2 class="text-xl font-semibold text-blue-800 mb-2">Manage Cashiers</h2>
-              <button onclick="openAddCashierModal()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Add Cashier</button>
-              <button onclick="openAssignCashierModal()" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 ml-2">Assign</button>
-              <ul class="mt-4 text-left">
-                ${gameState.cashiers.map(c => `
-                  <li class="mb-2">
-                    ${c.name} (Location: ${gameState.locations.find(l => l.id === c.locationId)?.name || 'None'}) - ${c.status}
-                    <button onclick="viewCashierLog(${c.id})" class="text-blue-600 ml-2">Log</button>
-                    <button onclick="deleteCashier(${c.id})" class="text-red-600 ml-2">Delete</button>
-                  </li>
-                `).join('')}
-              </ul>
-            </div>
-            <div class="bg-gray-100 p-4 rounded-lg shadow">
-              <h2 class="text-xl font-semibold text-blue-800 mb-2">Manage Screens</h2>
-              <button onclick="openAddScreenModal()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Add Screen</button>
-              <ul class="mt-4 text-left">
-                ${gameState.screens.map(s => `
-                  <li class="mb-2">
-                    ${s.type} - Location: ${gameState.locations.find(l => l.id === s.locationId)?.name || 'None'} (${s.status})
-                    <button onclick="deleteScreen(${s.id})" class="text-red-600 ml-2">Delete</button>
-                  </li>
-                `).join('')}
-              </ul>
-            </div>
-            <div class="bg-gray-100 p-4 rounded-lg shadow">
-              <h2 class="text-xl font-semibold text-blue-800 mb-2">Jackpot Tiers</h2>
-              <button onclick="openEditJackpotModal()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Edit Jackpots</button>
-              <ul class="mt-4 text-left">
-                ${gameState.jackpots.map(j => `
-                  <li class="mb-2">
-                    Location ${gameState.locations.find(l => l.id === j.locationId)?.name || 'None'}: 
-                    Bronze: $${j.bronze}, Silver: $${j.silver}, Gold: $${j.gold}, Max: $${j.max}
-                  </li>
-                `).join('')}
-              </ul>
-            </div>
-          </div>
+function showNotification(message, type = 'success') {
+  const notification = document.getElementById('notification');
+  notification.textContent = message;
+  notification.style.background = type === 'error' ? 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)' : 'linear-gradient(135deg, #2ecc71 0%, #27ae60 100%)';
+  notification.style.display = 'block';
+  setTimeout(() => {
+    notification.style.display = 'none';
+  }, 3000);
+}
 
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <div class="bg-gray-100 p-4 rounded-lg shadow">
-              <h2 class="text-xl font-semibold text-blue-800 mb-2">Game Configuration</h2>
-              <button onclick="openGameConfigModal()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Configure Game</button>
-              <p class="mt-2">Draw Interval: ${gameState.gameConfig.drawInterval}s</p>
-              <p>Bonus Ball: ${gameState.gameConfig.bonusBallEnabled ? 'Enabled' : 'Disabled'}</p>
-              <p>Auto Draw: ${gameState.gameConfig.autoDraw ? 'Enabled' : 'Disabled'}</p>
-            </div>
-            <div class="bg-gray-100 p-4 rounded-lg shadow">
-              <h2 class="text-xl font-semibold text-blue-800 mb-2">Reports</h2>
-              <button onclick="generateReport()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Generate Report</button>
-              <ul class="mt-4 text-left">
-                ${gameState.reports.map(r => `
-                  <li class="mb-2">
-                    Report #${r.id}: ${r.type} (${r.date}) - $${r.totalRevenue}
-                    <button onclick="viewReport(${r.id})" class="text-blue-600 ml-2">View</button>
-                  </li>
-                `).join('')}
-              </ul>
-            </div>
-          </div>
+function formatCurrency(amount) {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+}
 
-          <div class="flex justify-center space-x-4 mb-6">
-            <button onclick="startGame()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition ${gameState.isRunning ? 'opacity-50 cursor-not-allowed' : ''}" ${gameState.isRunning ? 'disabled' : ''}>Start Game</button>
-            <button onclick="drawBall()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition ${!gameState.isRunning ? 'opacity-50 cursor-not-allowed' : ''}" ${!gameState.isRunning ? 'disabled' : ''}>Draw Ball</button>
-            <button onclick="stopGame()" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition ${!gameState.isRunning ? 'opacity-50 cursor-not-allowed' : ''}" ${!gameState.isRunning ? 'disabled' : ''}>Stop Game</button>
-            <button onclick="resetGame()" class="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition">Reset Game</button>
-            <button onclick="sendNotificationPrompt()" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition">Send Notification</button>
-          </div>
+function formatDate(date) {
+  return new Date(date).toLocaleString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
 
-          <div class="text-lg font-semibold text-gray-800 mb-4">
-            <span>Game Status: <span class="text-${gameState.isRunning ? 'green' : 'red'}-600">${gameState.isRunning ? 'Running' : 'Stopped'}</span></span>
-            <span class="ml-6">Next Draw: <span id="timer">${gameState.timer}s</span></span>
-          </div>
+function debounce(func, wait) {
+  let timeout;
+  return function (...args) {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(this, args), wait);
+  };
+}
 
-          <div class="bg-gray-100 p-4 rounded-lg mb-6">
-            <h2 class="text-2xl font-semibold text-blue-800">Drawn Balls: ${gameState.drawnBalls.join(', ')}</h2>
-            ${gameState.bonusBall ? `<p class="text-lg text-yellow-600 font-semibold">Bonus Ball: ${gameState.bonusBall}</p>` : ''}
-          </div>
+async function initSocket() {
+  try {
+    socket = io(`ws://localhost:3000`, {
+      auth: { token },
+      transports: ['websocket'],
+      secure: true,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000
+    });
 
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h2 class="text-2xl font-semibold text-blue-800 mb-4">Players (${gameState.players.length})</h2>
-              <button onclick="openBanPlayerModal()" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 mb-4">Ban Player</button>
-              <ul class="space-y-4">
-                ${gameState.players.map(p => `
-                  <li class="bg-gray-50 p-4 rounded-lg shadow">
-                    <p class="font-semibold">${p.name}</p>
-                    <p>Tickets: ${p.tickets.length} | Wins: ${p.wins || 0} | Balance: $${p.balance || 0}</p>
-                    ${p.tickets.length > 0 ? `
-                      <div class="mt-2">
-                        <h3 class="font-semibold">Latest Ticket:</h3>
-                        <div class="ticket-grid">
-                          ${p.tickets[p.tickets.length - 1].map(row => row.map(num => `
-                            <div class="ticket-cell ${gameState.drawnBalls.includes(num) ? 'drawn' : ''}">${num}</div>
-                          `).join('')).join('')}
-                        </div>
-                      </div>` : ''}
-                  </li>
-                `).join('')}
-              </ul>
-            </div>
+    socket.on('connect', () => {
+      socket.emit('authenticate', token);
+    });
 
-            <div>
-              <h2 class="text-2xl font-semibold text-blue-800 mb-4">Game History</h2>
-              <ul class="space-y-4">
-                ${gameState.gameHistory.map((game, index) => `
-                  <li class="bg-gray-50 p-4 rounded-lg shadow">
-                    <p class="font-semibold">Game #${index + 1}</p>
-                    <p>Location: ${gameState.locations.find(l => l.id === game.locationId)?.name || 'None'}</p>
-                    <p>Drawn Balls: ${game.drawnBalls.join(', ')}</p>
-                    <p>Winner: ${game.winner || 'None'}</p>
-                  </li>
-                `).join('')}
-              </ul>
-            </div>
-          </div>
-        </div>`;
-    }
-
-    // Modal Handling
-    function openModal(title, body, onSubmit) {
-      const modal = document.getElementById('modal');
-      document.getElementById('modal-title').textContent = title;
-      document.getElementById('modal-body').innerHTML = body;
-      document.getElementById('modal-submit').onclick = onSubmit;
-      document.getElementById('modal-close').onclick = () => modal.style.display = 'none';
-      modal.style.display = 'flex';
-    }
-
-    function openAddLocationModal() {
-      openModal('Add Location', `
-        <label class="block mb-2">Name</label>
-        <input id="loc-name" type="text" class="border p-2 rounded w-full mb-2">
-        <label class="block mb-2">Address</label>
-        <input id="loc-address" type="text" class="border p-2 rounded w-full mb-2">
-        <label class="block mb-2">Max Win ($)</label>
-        <input id="loc-max-win" type="number" class="border p-2 rounded w-full mb-2">
-        <label class="block mb-2">Winning Pattern</label>
-        <select id="loc-pattern" class="border p-2 rounded w-full">
-          <option value="Full Card">Full Card</option>
-          <option value="Four Corners">Four Corners</option>
-          <option value="Line">Line</option>
-        </select>
-        <label class="block mb-2">Max Balls</label>
-        <input id="loc-max-balls" type="number" class="border p-2 rounded w-full">
-      `, () => {
-        const name = document.getElementById('loc-name').value;
-        const address = document.getElementById('loc-address').value;
-        const maxWin = Number(document.getElementById('loc-max-win').value);
-        const pattern = document.getElementById('loc-pattern').value;
-        const maxBalls = Number(document.getElementById('loc-max-balls').value);
-        addLocation({ name, address, maxWin, rules: { pattern, maxBalls } });
-        document.getElementById('modal').style.display = 'none';
-      });
-    }
-
-    function openEditLocationModal() {
-      openModal('Edit Location', `
-        <label class="block mb-2">Select Location</label>
-        <select id="loc-id" class="border p-2 rounded w-full mb-2">
-          ${gameState.locations.map(l => `<option value="${l.id}">${l.name}</option>`).join('')}
-        </select>
-        <label class="block mb-2">Name</label>
-        <input id="loc-name" type="text" class="border p-2 rounded w-full mb-2">
-        <label class="block mb-2">Address</label>
-        <input id="loc-address" type="text" class="border p-2 rounded w-full mb-2">
-        <label class="block mb-2">Max Win ($)</label>
-        <input id="loc-max-win" type="number" class="border p-2 rounded w-full mb-2">
-        <label class="block mb-2">Winning Pattern</label>
-        <select id="loc-pattern" class="border p-2 rounded w-full">
-          <option value="Full Card">Full Card</option>
-          <option value="Four Corners">Four Corners</option>
-          <option value="Line">Line</option>
-        </select>
-        <label class="block mb-2">Max Balls</label>
-        <input id="loc-max-balls" type="number" class="border p-2 rounded w-full">
-      `, () => {
-        const id = Number(document.getElementById('loc-id').value);
-        const name = document.getElementById('loc-name').value;
-        const address = document.getElementById('loc-address').value;
-        const maxWin = Number(document.getElementById('loc-max-win').value);
-        const pattern = document.getElementById('loc-pattern').value;
-        const maxBalls = Number(document.getElementById('loc-max-balls').value);
-        editLocation(id, { name, address, maxWin, rules: { pattern, maxBalls } });
-        document.getElementById('modal').style.display = 'none';
-      });
-    }
-
-    function openAddCashierModal() {
-      openModal('Add Cashier', `
-        <label class="block mb-2">Name</label>
-        <input id="cashier-name" type="text" class="border p-2 rounded w-full mb-2">
-        <label class="block mb-2">Location</label>
-        <select id="cashier-location" class="border p-2 rounded w-full">
-          <option value="">None</option>
-          ${gameState.locations.map(l => `<option value="${l.id}">${l.name}</option>`).join('')}
-        </select>
-      `, () => {
-        const name = document.getElementById('cashier-name').value;
-        const locationId = Number(document.getElementById('cashier-location').value) || null;
-        addCashier({ name, locationId });
-        document.getElementById('modal').style.display = 'none';
-      });
-    }
-
-    function openAssignCashierModal() {
-      openModal('Assign Cashier', `
-        <label class="block mb-2">Select Cashier</label>
-        <select id="cashier-id" class="border p-2 rounded w-full mb-2">
-          ${gameState.cashiers.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
-        </select>
-        <label class="block mb-2">Location</label>
-        <select id="cashier-location" class="border p-2 rounded w-full">
-          <option value="">None</option>
-          ${gameState.locations.map(l => `<option value="${l.id}">${l.name}</option>`).join('')}
-        </select>
-      `, () => {
-        const cashierId = Number(document.getElementById('cashier-id').value);
-        const locationId = Number(document.getElementById('cashier-location').value) || null;
-        assignCashier(cashierId, locationId);
-        document.getElementById('modal').style.display = 'none';
-      });
-    }
-
-    function openAddScreenModal() {
-      openModal('Add Display Screen', `
-        <label class="block mb-2">Type</label>
-        <select id="screen-type" class="border p-2 rounded w-full mb-2">
-          <option value="Flashboard">Flashboard</option>
-          <option value="Info Display">Info Display</option>
-        </select>
-        <label class="block mb-2">Location</label>
-        <select id="screen-location" class="border p-2 rounded w-full">
-          ${gameState.locations.map(l => `<option value="${l.id}">${l.name}</option>`).join('')}
-        </select>
-      `, () => {
-        const type = document.getElementById('screen-type').value;
-        const locationId = Number(document.getElementById('screen-location').value);
-        addScreen({ type, locationId });
-        document.getElementById('modal').style.display = 'none';
-      });
-    }
-
-    function openEditJackpotModal() {
-      openModal('Edit Jackpot Tiers', `
-        <label class="block mb-2">Select Location</label>
-        <select id="jackpot-location" class="border p-2 rounded w-full mb-2">
-          ${gameState.locations.map(l => `<option value="${l.id}">${l.name}</option>`).join('')}
-        </select>
-        <label class="block mb-2">Bronze ($)</label>
-        <input id="jackpot-bronze" type="number" class="border p-2 rounded w-full mb-2">
-        <label class="block mb-2">Silver ($)</label>
-        <input id="jackpot-silver" type="number" class="border p-2 rounded w-full mb-2">
-        <label class="block mb-2">Gold ($)</label>
-        <input id="jackpot-gold" type="number" class="border p-2 rounded w-full mb-2">
-        <label class="block mb-2">Max ($)</label>
-        <input id="jackpot-max" type="number" class="border p-2 rounded w-full">
-      `, () => {
-        const locationId = Number(document.getElementById('jackpot-location').value);
-        const bronze = Number(document.getElementById('jackpot-bronze').value);
-        const silver = Number(document.getElementById('jackpot-silver').value);
-        const gold = Number(document.getElementById('jackpot-gold').value);
-        const max = Number(document.getElementById('jackpot-max').value);
-        editJackpot(locationId, { bronze, silver, gold, max });
-        document.getElementById('modal').style.display = 'none';
-      });
-    }
-
-    function openGameConfigModal() {
-      openModal('Configure Game', `
-        <label class="block mb-2">Draw Interval (seconds)</label>
-        <input id="game-draw-interval" type="number" value="${gameState.gameConfig.drawInterval}" class="border p-2 rounded w-full mb-2">
-        <label class="block mb-2">Bonus Ball</label>
-        <input id="game-bonus-ball" type="checkbox" ${gameState.gameConfig.bonusBallEnabled ? 'checked' : ''} class="mb-2">
-        <label class="block mb-2">Auto Draw</label>
-        <input id="game-auto-draw" type="checkbox" ${gameState.gameConfig.autoDraw ? 'checked' : ''}>
-      `, () => {
-        const drawInterval = Number(document.getElementById('game-draw-interval').value);
-        const bonusBallEnabled = document.getElementById('game-bonus-ball').checked;
-        const autoDraw = document.getElementById('game-auto-draw').checked;
-        updateGameConfig({ drawInterval, bonusBallEnabled, autoDraw });
-        document.getElementById('modal').style.display = 'none';
-      });
-    }
-
-    function openBanPlayerModal() {
-      openModal('Ban Player', `
-        <label class="block mb-2">Select Player</label>
-        <select id="player-id" class="border p-2 rounded w-full">
-          ${gameState.players.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
-        </select>
-      `, () => {
-        const playerId = Number(document.getElementById('player-id').value);
-        banPlayer(playerId);
-        document.getElementById('modal').style.display = 'none';
-      });
-    }
-
-    function sendNotificationPrompt() {
-      openModal('Send Notification', `
-        <label class="block mb-2">Message</label>
-        <textarea id="notification-message" class="border p-2 rounded w-full"></textarea>
-        <label class="block mb-2">Target</label>
-        <select id="notification-target" class="border p-2 rounded w-full">
-          <option value="all">All Users</option>
-          <option value="players">Players</option>
-          <option value="cashiers">Cashiers</option>
-        </select>
-      `, () => {
-        const message = document.getElementById('notification-message').value;
-        const target = document.getElementById('notification-target').value;
-        sendNotification(message, target);
-        document.getElementById('modal').style.display = 'none';
-      });
-    }
-
-    // Admin Actions
-    async function addLocation(location) {
-      const newLocation = { id: gameState.locations.length + 1, ...location };
-      gameState.locations.push(newLocation);
-      await fetch('/api/locations', { method: 'POST', body: JSON.stringify(newLocation), headers: { 'Content-Type': 'application/json' } });
-      renderAdminDashboard();
-      showNotification(`Location ${location.name} added!`);
-    }
-
-    async function editLocation(id, updates) {
-      gameState.locations = gameState.locations.map(l => l.id === id ? { ...l, ...updates } : l);
-      await fetch(`/api/locations/${id}`, { method: 'PUT', body: JSON.stringify(updates), headers: { 'Content-Type': 'application/json' } });
-      renderAdminDashboard();
-      showNotification(`Location updated!`);
-    }
-
-    async function deleteLocation(id) {
-      gameState.locations = gameState.locations.filter(l => l.id !== id);
-      gameState.cashiers = gameState.cashiers.map(c => c.locationId === id ? { ...c, locationId: null } : c);
-      gameState.screens = gameState.screens.filter(s => s.locationId !== id);
-      gameState.jackpots = gameState.jackpots.filter(j => j.locationId !== id);
-      await fetch(`/api/locations/${id}`, { method: 'DELETE' });
-      renderAdminDashboard();
-      showNotification(`Location deleted!`);
-    }
-
-    async function addCashier(cashier) {
-      const newCashier = { id: gameState.cashiers.length + 1, status: 'active', activityLog: [], ...cashier };
-      gameState.cashiers.push(newCashier);
-      await fetch('/api/cashiers', { method: 'POST', body: JSON.stringify(newCashier), headers: { 'Content-Type': 'application/json' } });
-      renderAdminDashboard();
-      showNotification(`Cashier ${cashier.name} added!`);
-    }
-
-    async function assignCashier(cashierId, locationId) {
-      gameState.cashiers = gameState.cashiers.map(c => c.id === cashierId ? { ...c, locationId, activityLog: [...c.activityLog, `Assigned to Location ${locationId} at ${new Date().toISOString()}`] } : c);
-      await fetch(`/api/cashiers/${cashierId}`, { method: 'PUT', body: JSON.stringify({ locationId }), headers: { 'Content-Type': 'application/json' } });
-      renderAdminDashboard();
-      showNotification(`Cashier assigned!`);
-    }
-
-    async function deleteCashier(id) {
-      gameState.cashiers = gameState.cashiers.filter(c => c.id !== id);
-      await fetch(`/api/cashiers/${id}`, { method: 'DELETE' });
-      renderAdminDashboard();
-      showNotification(`Cashier deleted!`);
-    }
-
-    function viewCashierLog(id) {
-      const cashier = gameState.cashiers.find(c => c.id === id);
-      openModal(`Activity Log for ${cashier.name}`, `
-        <ul class="text-left">
-          ${cashier.activityLog.map(log => `<li>${log}</li>`).join('')}
-        </ul>
-      `, () => document.getElementById('modal').style.display = 'none');
-    }
-
-    async function addScreen(screen) {
-      const newScreen = { id: gameState.screens.length + 1, status: 'online', ...screen };
-      gameState.screens.push(newScreen);
-      await fetch('/api/screens', { method: 'POST', body: JSON.stringify(newScreen), headers: { 'Content-Type': 'application/json' } });
-      renderAdminDashboard();
-      showNotification(`Screen added!`);
-    }
-
-    async function deleteScreen(id) {
-      gameState.screens = gameState.screens.filter(s => s.id !== id);
-      await fetch(`/api/screens/${id}`, { method: 'DELETE' });
-      renderAdminDashboard();
-      showNotification(`Screen deleted!`);
-    }
-
-    async function editJackpot(locationId, updates) {
-      const existing = gameState.jackpots.find(j => j.locationId === locationId);
-      if (existing) {
-        gameState.jackpots = gameState.jackpots.map(j => j.locationId === locationId ? { ...j, ...updates } : j);
-        await fetch(`/api/jackpots/${existing.id}`, { method: 'PUT', body: JSON.stringify(updates), headers: { 'Content-Type': 'application/json' } });
+    socket.on('authenticated', ({ role }) => {
+      if (role === 'admin') {
+        showNotification('Successfully authenticated as admin');
+        socket.emit('requestGameState');
+        socket.emit('requestFinancials');
+        socket.emit('requestErrorLogs');
       } else {
-        const newJackpot = { id: gameState.jackpots.length + 1, locationId, ...updates };
-        gameState.jackpots.push(newJackpot);
-        await fetch('/api/jackpots', { method: 'POST', body: JSON.stringify(newJackpot), headers: { 'Content-Type': 'application/json' } });
-      }
-      renderAdminDashboard();
-      showNotification(`Jackpot updated!`);
-    }
-
-    async function updateGameConfig(config) {
-      gameState.gameConfig = { ...gameState.gameConfig, ...config };
-      gameState.timer = config.drawInterval;
-      await fetch('/api/game-config', { method: 'PUT', body: JSON.stringify(config), headers: { 'Content-Type': 'application/json' } });
-      renderAdminDashboard();
-      showNotification(`Game configuration updated!`);
-    }
-
-    async function banPlayer(playerId) {
-      gameState.players = gameState.players.map(p => p.id === playerId ? { ...p, status: 'banned' } : p);
-      await fetch(`/api/players/${playerId}`, { method: 'PUT', body: JSON.stringify({ status: 'banned' }), headers: { 'Content-Type': 'application/json' } });
-      renderAdminDashboard();
-      showNotification(`Player banned!`);
-    }
-
-    async function generateReport() {
-      const report = {
-        id: gameState.reports.length + 1,
-        type: 'Game Summary',
-        date: new Date().toISOString(),
-        totalRevenue: gameState.players.reduce((sum, p) => sum + (p.tickets.length * 10), 0),
-        totalTickets: gameState.players.reduce((sum, p) => sum + p.tickets.length, 0),
-        winners: gameState.gameHistory.filter(g => g.winner).map(g => g.winner)
-      };
-      gameState.reports.push(report);
-      await fetch('/api/reports', { method: 'POST', body: JSON.stringify(report), headers: { 'Content-Type': 'application/json' } });
-      renderAdminDashboard();
-      showNotification(`Report generated!`);
-    }
-
-    function viewReport(id) {
-      const report = gameState.reports.find(r => r.id === id);
-      openReportModal(report);
-    }
-
-    function openReportModal(report) {
-      openModal(`Report #${report.id}`, `
-        <p>Type: ${report.type}</p>
-        <p>Date: ${report.date}</p>
-        <p>Total Revenue: $${report.totalRevenue}</p>
-        <p>Total Tickets: ${report.totalTickets}</p>
-        <p>Winners: ${report.winners.join(', ') || 'None'}</p>
-      `, () => document.getElementById('modal').style.display = 'none');
-    }
-
-    async function sendNotification(message, target) {
-      await fetch('/api/notifications', { method: 'POST', body: JSON.stringify({ message, target }), headers: { 'Content-Type': 'application/json' } });
-      socket.emit('notification', { message, target });
-      showNotification(`Notification sent to ${target}!`);
-    }
-
-    async function startGame() {
-      gameState.isRunning = true;
-      gameState.drawnBalls = [];
-      gameState.availableBalls = Array.from({ length: 75 }, (_, i) => i + 1);
-      gameState.bonusBall = null;
-      gameState.winner = null;
-      await fetch('/api/start-game', { method: 'POST', body: JSON.stringify({ locationId: 1 }), headers: { 'Content-Type': 'application/json' } });
-      socket.emit('gameState', gameState);
-      startTimer();
-      renderAdminDashboard();
-      showNotification('Game started!');
-    }
-
-    async function drawBall() {
-      if (gameState.availableBalls.length === 0) return;
-      const ball = gameState.availableBalls.splice(Math.floor(Math.random() * gameState.availableBalls.length), 1)[0];
-      gameState.drawnBalls.push(ball);
-      if (gameState.gameConfig.bonusBallEnabled && gameState.drawnBalls.length === gameState.locations.find(l => l.id === 1).rules.maxBalls) {
-        gameState.bonusBall = ball;
-        socket.emit('bonusBall', ball);
-      }
-      await fetch('/api/draw-ball', { method: 'POST', body: JSON.stringify({ ball }), headers: { 'Content-Type': 'application/json' } });
-      socket.emit('gameState', gameState);
-      gameState.timer = gameState.gameConfig.drawInterval;
-      checkForWinner();
-      renderAdminDashboard();
-    }
-
-    async function stopGame() {
-      gameState.isRunning = false;
-      gameState.gameHistory.push({
-        locationId: 1,
-        drawnBalls: [...gameState.drawnBalls],
-        winner: gameState.winner,
-        timestamp: new Date().toISOString()
-      });
-      await fetch('/api/stop-game', { method: 'POST', body: JSON.stringify(gameState), headers: { 'Content-Type': 'application/json' } });
-      socket.emit('gameState', gameState);
-      clearInterval(window.timerInterval);
-      renderAdminDashboard();
-      showNotification('Game stopped!');
-    }
-
-    async function resetGame() {
-      gameState.isRunning = false;
-      gameState.drawnBalls = [];
-      gameState.availableBalls = Array.from({ length: 75 }, (_, i) => i + 1);
-      gameState.bonusBall = null;
-      gameState.winner = null;
-      await fetch('/api/reset-game', { method: 'POST' });
-      socket.emit('gameState', gameState);
-      clearInterval(window.timerInterval);
-      renderAdminDashboard();
-      showNotification('Game reset!');
-    }
-
-    function startTimer() {
-      gameState.timer = gameState.gameConfig.drawInterval;
-      clearInterval(window.timerInterval);
-      window.timerInterval = setInterval(() => {
-        if (gameState.timer > 0 && gameState.isRunning) {
-          gameState.timer--;
-          document.getElementById('timer').textContent = `${gameState.timer}s`;
-        } else if (gameState.timer === 0 && gameState.isRunning && gameState.gameConfig.autoDraw) {
-          drawBall();
-        }
-      }, 1000);
-    }
-
-    function checkForWinner() {
-      const location = gameState.locations.find(l => l.id === 1); // Mock location
-      gameState.players.forEach(player => {
-        player.tickets.forEach(ticket => {
-          const isWinner = checkWinningPattern(ticket, location.rules.pattern);
-          if (isWinner) {
-            gameState.winner = player.name;
-            socket.emit('gameState', gameState);
-            showNotification(`Winner: ${player.name}!`);
-          }
-        });
-      });
-    }
-
-    function checkWinningPattern(ticket, pattern) {
-      const flatTicket = ticket.flat();
-      switch (pattern) {
-        case 'Full Card':
-          return flatTicket.every(num => gameState.drawnBalls.includes(num));
-        case 'Four Corners':
-          return [ticket[0][0], ticket[0][4], ticket[4][0], ticket[4][4]].every(num => gameState.drawnBalls.includes(num));
-        case 'Line':
-          return ticket.some(row => row.every(num => gameState.drawnBalls.includes(num)));
-        default:
-          return false;
-      }
-    }
-
-    function showNotification(message) {
-      const notification = document.getElementById('notification');
-      notification.textContent = message;
-      notification.style.display = 'block';
-      setTimeout(() => { notification.style.display = 'none'; }, 3000);
-    }
-
-    socket.on('gameState', (newState) => {
-      gameState = newState;
-      renderAdminDashboard();
-      if (newState.winner) {
-        showNotification(`Winner: ${newState.winner}!`);
+        showNotification('Unauthorized access', 'error');
+        socket.disconnect();
       }
     });
 
-    socket.on('bonusBall', (bonusBall) => {
-      gameState.bonusBall = bonusBall;
-      showNotification(`Bonus Ball Drawn: ${bonusBall}!`);
+    socket.on('authError', (message) => {
+      showNotification(message, 'error');
+      localStorage.removeItem('token');
+      socket.disconnect();
     });
 
-    socket.on('notification', ({ message, target }) => {
-      if (target === 'all' || target === 'admins') {
-        showNotification(message);
+    socket.on('gameState', (state) => {
+      currentState = state;
+      renderSection(document.querySelector('.nav-item.active').getAttribute('onclick').match(/'([^']+)'/)[1], state);
+    });
+
+    socket.on('financials', (financials) => {
+      currentState = { ...currentState, financials };
+      if (document.querySelector('.nav-item.active').getAttribute('onclick') === "navigate('financials')") {
+        renderSection('financials', currentState);
       }
     });
 
-    renderAdminDashboard();
+    socket.on('errorLogs', (errorLogs) => {
+      currentState = { ...currentState, errorLogs };
+      if (document.querySelector('.nav-item.active').getAttribute('onclick') === "navigate('error-logs')") {
+        renderSection('error-logs', currentState);
+      }
+    });
+
+    socket.on('balanceUpdate', ({ totalEarnings }) => {
+      if (document.getElementById('total-earned')) {
+        document.getElementById('total-earned').textContent = formatCurrency(totalEarnings);
+        document.getElementById('pending-collection').textContent = formatCurrency(totalEarnings);
+      }
+      if (document.querySelector('.nav-item.active').getAttribute('onclick') === "navigate('financials')") {
+        socket.emit('requestFinancials');
+      }
+    });
+
+    socket.on('cashiersUpdated', (cashiers) => {
+      currentState = { ...currentState, cashiers };
+      if (document.getElementById('total-cashiers')) {
+        document.getElementById('total-cashiers').textContent = `${cashiers.length} Cashiers`;
+      }
+      if (document.querySelector('.nav-item.active').getAttribute('onclick') === "navigate('cashiers')") {
+        renderSection('cashiers', currentState);
+      }
+    });
+
+    socket.on('screensUpdated', (screens) => {
+      currentState = { ...currentState, screens };
+      if (document.getElementById('total-displays')) {
+        document.getElementById('total-displays').textContent = `${screens.length} Displays`;
+      }
+      if (document.querySelector('.nav-item.active').getAttribute('onclick') === "navigate('screens')") {
+        renderSection('screens', currentState);
+      }
+    });
+
+    socket.on('locationsUpdated', (locations) => {
+      currentState = { ...currentState, locations };
+      if (document.getElementById('total-locations')) {
+        document.getElementById('total-locations').textContent = `${locations.length} Locations`;
+      }
+      if (document.querySelector('.nav-item.active').getAttribute('onclick') === "navigate('locations')") {
+        renderSection('locations', currentState);
+      }
+    });
+
+    socket.on('locationAdded', ({ location }) => {
+      showNotification(`Location ${location.name} added successfully`);
+      socket.emit('requestGameState');
+    });
+
+    socket.on('cashierAdded', ({ cashier }) => {
+      showNotification(`Cashier ${cashier.username} added successfully`);
+      socket.emit('requestGameState');
+    });
+
+    socket.on('screenAdded', ({ screen }) => {
+      showNotification(`Display Screen ${screen.name} added successfully`);
+      socket.emit('requestGameState');
+    });
+
+    socket.on('jackpotUpdated', ({ tier }) => {
+      showNotification(`Jackpot tier ${tier.name} updated successfully`);
+      socket.emit('requestGameState');
+    });
+
+    socket.on('earningsCollected', ({ cashierId }) => {
+      showNotification(`Earnings collected for cashier ID ${cashierId}`);
+      socket.emit('requestFinancials');
+    });
+
+    socket.on('error', (message) => {
+      showNotification(message, 'error');
+    });
+
+    socket.on('gameStarted', ({ gameId }) => {
+      showNotification(`Game ${gameId} started`);
+      socket.emit('requestGameState');
+    });
+
+    socket.on('gameReset', () => {
+      showNotification('Game has been reset');
+      socket.emit('requestGameState');
+    });
+
+    socket.on('autoDrawPaused', () => {
+      showNotification('Auto draw paused');
+      socket.emit('requestGameState');
+    });
+
+    socket.on('ballDrawn', ({ number }) => {
+      showNotification(`Ball ${number} drawn`);
+      socket.emit('requestGameState');
+    });
+
+    socket.on('bonusBall', (number) => {
+      showNotification(`Bonus Ball ${number} drawn`);
+      socket.emit('requestGameState');
+    });
+
+    socket.on('winner', (winner) => {
+      showNotification(`Winner: ${winner.player} won ${formatCurrency(winner.prize)}!`);
+      socket.emit('requestGameState');
+    });
+
+    socket.on('reportGenerated', ({ reportType, data }) => {
+      if (reportType === 'win-tickets') {
+        generateWinTicketsReportPDF(data);
+      } else if (reportType === 'income') {
+        generateIncomeReportPDF(data);
+      }
+    });
+
+    socket.on('connect_error', (err) => {
+      console.error('Socket connection error:', err);
+      showNotification('Failed to connect to server', 'error');
+    });
+
+    socket.on('disconnect', (reason) => {
+      console.log(`Disconnected: ${reason}`);
+      showNotification('Disconnected from server', 'error');
+    });
+  } catch (err) {
+    console.error('Error initializing socket:', err);
+    showNotification('Failed to connect to server', 'error');
+  }
+}
+
+function updateDashboard(state) {
+  if (!document.getElementById('game-status')) return;
+  document.getElementById('game-status').textContent = state.isRunning ? 'Running' : state.isCountingDown ? 'Starting' : 'Stopped';
+  document.getElementById('game-id').textContent = state.gameId || 'N/A';
+  document.getElementById('game-location').textContent = state.locations?.find(l => l.id === state.players[0]?.locationId)?.name || 'N/A';
+  document.getElementById('active-players').textContent = state.players?.length || 0;
+  document.getElementById('drawn-balls').textContent = state.drawnBalls?.length ? state.drawnBalls.join(', ') : 'None';
+  document.getElementById('bonus-ball').textContent = state.bonusBall ? `Bonus Ball: ${state.bonusBall}` : '';
+  document.getElementById('remaining-balls').textContent = state.availableBalls?.length || 0;
+  document.getElementById('recent-balls').textContent = state.recentBalls?.length ? state.recentBalls.join(', ') : 'None';
+  document.getElementById('total-earned').textContent = formatCurrency(state.financials?.totalEarnings || 0);
+  document.getElementById('pending-collection').textContent = formatCurrency(state.financials?.totalEarnings || 0);
+  document.getElementById('today-earnings').textContent = formatCurrency(state.financials?.earnings?.reduce((sum, e) => {
+    const earnedAt = new Date(e.earned_at);
+    const today = new Date();
+    return earnedAt.toDateString() === today.toDateString() ? sum + e.amount : sum;
+  }, 0) || 0);
+  document.getElementById('total-cashiers').textContent = `${state.cashiers?.length || 0} Cashiers`;
+  document.getElementById('total-displays').textContent = `${state.screens?.length || 0} Displays`;
+  document.getElementById('total-locations').textContent = `${state.locations?.length || 0} Locations`;
+
+  const recentActivity = document.getElementById('recent-activity');
+  recentActivity.innerHTML = '';
+  const activities = (state.financials?.earnings || []).slice(0, 5).map(e => ({
+    event: 'Ticket Sold',
+    details: `Player: ${e.player_name || 'N/A'}, Amount: ${formatCurrency(e.amount)}, Slip: ${e.slip_number || 'N/A'}`,
+    time: new Date(e.earned_at).toLocaleTimeString()
+  }));
+  if (activities.length === 0) {
+    recentActivity.innerHTML = '<tr><td colspan="3" class="text-center">No recent activity</td></tr>';
+  } else {
+    activities.forEach(a => {
+      const row = document.createElement('tr');
+      row.innerHTML = `<td>${a.event}</td><td>${a.details}</td><td>${a.time}</td>`;
+      recentActivity.appendChild(row);
+    });
+  }
+
+  if (state.isRunning || state.isCountingDown) {
+    const timer = document.getElementById('timer');
+    const updateTimer = () => {
+      const now = Date.now();
+      const endTime = state.drawEndTime || now + 300000;
+      const timeLeft = Math.max(0, Math.floor((endTime - now) / 1000));
+      timer.textContent = `${timeLeft}s`;
+      if (timeLeft > 0) setTimeout(updateTimer, 1000);
+    };
+    updateTimer();
+  } else {
+    document.getElementById('timer').textContent = '30s';
+  }
+}
+
+function showAddLocationModal() {
+  const modal = document.getElementById('modal');
+  const modalTitle = document.getElementById('modal-title');
+  const modalBody = document.getElementById('modal-body');
+  const modalSubmit = document.getElementById('modal-submit');
+
+  modalTitle.textContent = 'Add New Location';
+  modalBody.innerHTML = `
+    <div class="mb-4">
+      <label class="form-label" for="location-name">Location Name</label>
+      <input type="text" id="location-name" class="form-input" placeholder="Enter location name" required>
+    </div>
+    <div class="mb-4">
+      <label class="form-label" for="location-address">Physical Address</label>
+      <input type="text" id="location-address" class="form-input" placeholder="Enter physical address" required>
+    </div>
+    <div class="mb-4">
+      <label class="form-label" for="max-win">Maximum Win</label>
+      <input type="number" id="max-win" class="form-input" placeholder="Enter maximum win amount" step="0.01" required>
+    </div>
+    <div class="mb-4">
+      <label class="form-label" for="location-rules">Rules (JSON)</label>
+      <textarea id="location-rules" class="form-input" placeholder='{"min_bet": 10, "max_bet": 100, "max_numbers": 6}' required></textarea>
+    </div>
+  `;
+
+  modal.style.display = 'flex';
+
+  modalSubmit.onclick = () => {
+    const name = document.getElementById('location-name').value;
+    const address = document.getElementById('location-address').value;
+    const maxWin = parseFloat(document.getElementById('max-win').value);
+    let rules;
+    try {
+      rules = JSON.parse(document.getElementById('location-rules').value);
+    } catch (e) {
+      showNotification('Invalid JSON for rules', 'error');
+      return;
+    }
+
+    if (!name || !address || isNaN(maxWin) || !rules) {
+      showNotification('Please fill in all fields correctly', 'error');
+      return;
+    }
+
+    socket.emit('addLocation', { name, address, maxWin, rules });
+    modal.style.display = 'none';
+  };
+}
+
+function showAddCashierModal() {
+  const modal = document.getElementById('modal');
+  const modalTitle = document.getElementById('modal-title');
+  const modalBody = document.getElementById('modal-body');
+  const modalSubmit = document.getElementById('modal-submit');
+
+  modalTitle.textContent = 'Add New Cashier';
+  modalBody.innerHTML = `
+    <div class="mb-4">
+      <label class="form-label" for="cashier-username">Username</label>
+      <input type="text" id="cashier-username" class="form-input" placeholder="Enter username" required>
+    </div>
+    <div class="mb-4">
+      <label class="form-label" for="cashier-password">Password</label>
+      <input type="password" id="cashier-password" class="form-input" placeholder="Enter password" required>
+    </div>
+    <div class="mb-4">
+      <label class="form-label" for="cashier-location">Location</label>
+      <select id="cashier-location" class="form-input" required>
+        ${currentState?.locations?.length ? currentState.locations.map(location => `
+          <option value="${location.id}">${location.name}</option>
+        `).join('') : '<option value="">No locations available</option>'}
+      </select>
+    </div>
+    <div class="mb-4">
+      <label class="form-label" for="cashier-status">Status</label>
+      <select id="cashier-status" class="form-input" required>
+        <option value="active">Active</option>
+        <option value="inactive">Inactive</option>
+      </select>
+    </div>
+  `;
+
+  modal.style.display = 'flex';
+
+  modalSubmit.onclick = () => {
+    const username = document.getElementById('cashier-username').value;
+    const password = document.getElementById('cashier-password').value;
+    const locationId = document.getElementById('cashier-location').value;
+    const status = document.getElementById('cashier-status').value;
+
+    if (!username || !password || !locationId) {
+      showNotification('Please fill in all fields correctly', 'error');
+      return;
+    }
+
+    socket.emit('addCashier', { username, password, locationId, status, role: 'cashier' });
+    modal.style.display = 'none';
+  };
+}
+
+function showAddScreenModal() {
+  const modal = document.getElementById('modal');
+  const modalTitle = document.getElementById('modal-title');
+  const modalBody = document.getElementById('modal-body');
+  const modalSubmit = document.getElementById('modal-submit');
+
+  modalTitle.textContent = 'Add New Display Screen';
+  modalBody.innerHTML = `
+    <div class="mb-4">
+      <label class="form-label" for="screen-name">Name</label>
+      <input type="text" id="screen-name" class="form-input" placeholder="Enter screen name" required>
+    </div>
+    <div class="mb-4">
+      <label class="form-label" for="screen-location">Assigned Location</label>
+      <select id="screen-location" class="form-input" required>
+        ${currentState?.locations?.length ? currentState.locations.map(location => `
+          <option value="${location.id}">${location.name}</option>
+        `).join('') : '<option value="">No locations available</option>'}
+      </select>
+    </div>
+    <div class="mb-4">
+      <label class="form-label" for="screen-status">Status</label>
+      <select id="screen-status" class="form-input" required>
+        <option value="active">Active</option>
+        <option value="inactive">Inactive</option>
+      </select>
+    </div>
+  `;
+
+  modal.style.display = 'flex';
+
+  modalSubmit.onclick = () => {
+    const name = document.getElementById('screen-name').value;
+    const locationId = document.getElementById('screen-location').value;
+    const status = document.getElementById('screen-status').value;
+
+    if (!name || !locationId) {
+      showNotification('Please fill in all fields correctly', 'error');
+      return;
+    }
+
+    socket.emit('addScreen', { name, locationId, status });
+    modal.style.display = 'none';
+  };
+}
+
+function showUpdateJackpotModal(tier) {
+  const modal = document.getElementById('modal');
+  const modalTitle = document.getElementById('modal-title');
+  const modalBody = document.getElementById('modal-body');
+  const modalSubmit = document.getElementById('modal-submit');
+
+  const assignedLocationIds = currentState?.locations
+    .filter(location => location.jackpotTier === tier.name)
+    .map(location => location.id) || [];
+
+  modalTitle.textContent = `Update ${tier.name} Jackpot Tier`;
+  modalBody.innerHTML = `
+    <div class="mb-4">
+      <label class="form-label" for="jackpot-name">Tier Name</label>
+      <input type="text" id="jackpot-name" class="form-input" value="${tier.name}" disabled>
+    </div>
+    <div class="mb-4">
+      <label class="form-label" for="jackpot-prize">Prize Amount</label>
+      <input type="number" id="jackpot-prize" class="form-input" value="${tier.prizeAmount || 0}" placeholder="Enter prize amount" step="0.01" required>
+    </div>
+    <div class="mb-4">
+      <label class="form-label" for="jackpot-locations">Assigned Locations</label>
+      <select id="jackpot-locations" class="form-input" multiple required>
+        ${currentState?.locations?.length ? currentState.locations.map(location => `
+          <option value="${location.id}" ${assignedLocationIds.includes(location.id) ? 'selected' : ''}>${location.name}</option>
+        `).join('') : '<option value="">No locations available</option>'}
+      </select>
+    </div>
+    <div class="mb-4">
+      <label class="form-label" for="jackpot-status">Status</label>
+      <select id="jackpot-status" class="form-input" required>
+        <option value="true" ${tier.active ? 'selected' : ''}>Active</option>
+        <option value="false" ${!tier.active ? 'selected' : ''}>Inactive</option>
+      </select>
+    </div>
+  `;
+
+  modal.style.display = 'flex';
+
+  modalSubmit.onclick = () => {
+    const prizeAmount = parseFloat(document.getElementById('jackpot-prize').value);
+    const locationIds = Array.from(document.getElementById('jackpot-locations').selectedOptions).map(option => option.value);
+    const active = document.getElementById('jackpot-status').value === 'true';
+
+    if (isNaN(prizeAmount) || prizeAmount <= 0) {
+      showNotification('Please enter a valid prize amount', 'error');
+      return;
+    }
+
+    socket.emit('updateJackpot', { 
+      tierId: tier.id, 
+      name: tier.name, 
+      prizeAmount, 
+      locationIds, 
+      active 
+    });
+    modal.style.display = 'none';
+  };
+}
+
+function collectEarnings(cashierId) {
+  socket.emit('collectEarnings', { cashierId });
+}
+
+function showWinTicketsReportModal() {
+  const modal = document.getElementById('modal');
+  const modalTitle = document.getElementById('modal-title');
+  const modalBody = document.getElementById('modal-body');
+  const modalSubmit = document.getElementById('modal-submit');
+
+  modalTitle.textContent = 'Generate Win Tickets Report';
+  modalBody.innerHTML = `
+    <div class="mb-4">
+      <label class="form-label" for="report-location">Location</label>
+      <select id="report-location" class="form-input">
+        <option value="">All Locations</option>
+        ${currentState?.locations?.length ? currentState.locations.map(location => `
+          <option value="${location.id}">${location.name}</option>
+        `).join('') : ''}
+      </select>
+    </div>
+    <div class="mb-4">
+      <label class="form-label" for="report-cashier">Cashier</label>
+      <select id="report-cashier" class="form-input">
+        <option value="">All Cashiers</option>
+        ${currentState?.users?.length ? currentState.users.map(cashier => `
+          <option value="${cashier.id}">${cashier.username}</option>
+        `).join('') : ''}
+      </select>
+    </div>
+    <div class="mb-4">
+      <label class="form-label" for="report-ticket">Ticket Number</label>
+      <input type="text" id="report-ticket" class="form-input" placeholder="Enter ticket number (partial match)">
+    </div>
+    <div class="mb-4">
+      <label class="form-label" for="report-start-date">Start Date</label>
+      <input type="date" id="report-start-date" class="form-input">
+    </div>
+    <div class="mb-4">
+      <label class="form-label" for="report-end-date">End Date</label>
+      <input type="date" id="report-end-date" class="form-input">
+    </div>
+  `;
+
+  modal.style.display = 'flex';
+
+  modalSubmit.onclick = () => {
+    const locationId = document.getElementById('report-location').value;
+    const cashierId = document.getElementById('report-cashier').value;
+    const ticketNumber = document.getElementById('report-ticket').value;
+    const startDate = document.getElementById('report-start-date').value;
+    const endDate = document.getElementById('report-end-date').value;
+
+    if (startDate && endDate && new Date(startDate) > new Date(endDate)) {
+      showNotification('Start date must be before end date', 'error');
+      return;
+    }
+
+    socket.emit('generateReport', { 
+      reportType: 'win-tickets',
+      filters: { locationId, cashierId, ticketNumber, startDate, endDate }
+    });
+    modal.style.display = 'none';
+  };
+}
+
+function generateWinTicketsReportPDF(data) {
+  const latexContent = `
+\\documentclass[a4paper,12pt]{article}
+\\usepackage[utf8]{inputenc}
+\\usepackage{geometry}
+\\geometry{margin=1in}
+\\usepackage{booktabs}
+\\usepackage{longtable}
+\\usepackage{pdflscape}
+\\usepackage{datetime}
+\\usepackage{siunitx}
+\\sisetup{group-separator={,},output-decimal-marker={.}}
+\\usepackage[scaled]{helvet}
+\\renewcommand{\\familydefault}{\\sfdefault}
+\\begin{document}
+
+\\begin{center}
+  \\textbf{\\LARGE Bingo Win Tickets Report}\\\\
+  \\vspace{0.5cm}
+  Generated on \\today\\ at \\currenttime
+\\end{center}
+
+\\section*{Report Filters}
+\\begin{itemize}
+  \\item \\textbf{Location}: ${data.filters.locationId ? currentState.locations.find(l => l.id === data.filters.locationId)?.name || 'All' : 'All'}
+  \\item \\textbf{Cashier}: ${data.filters.cashierId ? currentState.cashiers.find(c => c.id === data.filters.cashierId)?.username || 'All' : 'All'}
+  \\item \\textbf{Ticket Number}: ${data.filters.ticketNumber || 'All'}
+  \\item \\textbf{Date Range}: ${data.filters.startDate ? formatDate(data.filters.startDate) : 'N/A'} to ${data.filters.endDate ? formatDate(data.filters.endDate) : 'N/A'}
+\\end{itemize}
+
+\\begin{landscape}
+\\begin{longtable}{lllp{3cm}llp{2cm}l}
+  \\caption{Winning Tickets Report} \\\\
+  \\toprule
+  \\textbf{Ticket Number} & \\textbf{Player Name} & \\textbf{Cashier} & \\textbf{Location} & \\textbf{Amount Won} & \\textbf{Date} & \\textbf{Collected} & \\textbf{Current Balance} \\\\
+  \\midrule
+  \\endfirsthead
+  \\toprule
+  \\textbf{Ticket Number} & \\textbf{Player Name} & \\textbf{Cashier} & \\textbf{Location} & \\textbf{Amount Won} & \\textbf{Date} & \\textbf{Collected} & \\textbf{Current Balance} \\\\
+  \\midrule
+  \\endhead
+  \\bottomrule
+  \\endfoot
+  ${data.earnings.map(e => {
+    const cashier = currentState.cashiers.find(c => c.id === e.cashierId);
+    const location = currentState.locations.find(l => l.id === e.locationId);
+    const currentBalance = currentState.financials?.earnings
+      .filter(earning => earning.cashierId === e.cashierId && !earning.collected)
+      .reduce((sum, earning) => sum + earning.amount, 0) || 0;
+    return `${e.slip_number || 'N/A'} & ${e.player_name || 'N/A'} & ${cashier?.username || 'N/A'} & ${location?.name || 'N/A'} & \\$\\num{${e.amount.toFixed(2)}} & ${formatDate(e.earned_at)} & ${e.collected ? 'Yes' : 'No'} & \\$\\num{${currentBalance.toFixed(2)}} \\\\`;
+  }).join('\n')}
+  \\bottomrule
+\\end{longtable}
+\\end{landscape}
+
+\\end{document}
+  `;
+
+  const blob = new Blob([latexContent], { type: 'text/latex' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'win_tickets_report.tex';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showNotification('Win Tickets Report generated successfully');
+}
+
+function generateIncomeReportPDF(data) {
+  const latexContent = `
+\\documentclass[a4paper,12pt]{article}
+\\usepackage[utf8]{inputenc}
+\\usepackage{geometry}
+\\geometry{margin=1in}
+\\usepackage{booktabs}
+\\usepackage{longtable}
+\\usepackage{pdflscape}
+\\usepackage{datetime}
+\\usepackage{siunitx}
+\\sisetup{group-separator={,},output-decimal-marker={.}}
+\\usepackage[scaled]{helvet}
+\\renewcommand{\\familydefault}{\\sfdefault}
+\\begin{document}
+
+\\begin{center}
+  \\textbf{\\LARGE Bingo Income Report}\\\\
+  \\vspace{0.5cm}
+  Generated on \\today\\ at \\currenttime
+\\end{center}
+
+\\section*{Summary}
+\\begin{itemize}
+  \\item \\textbf{Total Earnings}: \\$\\num{${data.totalEarnings.toFixed(2)}}
+  \\item \\textbf{Total Transactions}: ${data.earnings.length}
+  \\item \\textbf{Date Range}: ${data.filters.startDate ? formatDate(data.filters.startDate) : 'N/A'} to ${data.filters.endDate ? formatDate(data.filters.endDate) : 'N/A'}
+\\end{itemize}
+
+\\begin{landscape}
+\\begin{longtable}{lllp{3cm}ll}
+  \\caption{Income Report} \\\\
+  \\toprule
+  \\textbf{Ticket Number} & \\textbf{Player Name} & \\textbf{Cashier} & \\textbf{Location} & \\textbf{Amount} & \\textbf{Date} \\\\
+  \\midrule
+  \\endfirsthead
+  \\toprule
+  \\textbf{Ticket Number} & \\textbf{Player Name} & \\textbf{Cashier} & \\textbf{Location} & \\textbf{Amount} & \\textbf{Date} \\\\
+  \\midrule
+  \\endhead
+  \\bottomrule
+  \\endfoot
+  ${data.earnings.map(e => {
+    const cashier = currentState.cashiers.find(c => c.id === e.cashierId);
+    const location = currentState.locations.find(l => l.id === e.locationId);
+    return `${e.slip_number || 'N/A'} & ${e.player_name || 'N/A'} & ${cashier?.username || 'N/A'} & ${location?.name || 'N/A'} & \\$\\num{${e.amount.toFixed(2)}} & ${formatDate(e.earned_at)} \\\\`;
+  }).join('\n')}
+  \\bottomrule
+\\end{longtable}
+\\end{landscape}
+
+\\end{document}
+  `;
+
+  const blob = new Blob([latexContent], { type: 'text/latex' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'income_report.tex';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showNotification('Income Report generated successfully');
+}
+
+const navigate = debounce((section) => {
+  document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+  document.querySelector(`.nav-item[onclick="navigate('${section}')"]`).classList.add('active');
+  renderSection(section, currentState);
+  if (section === 'financials') {
+    socket.emit('requestFinancials');
+  } else if (section === 'error-logs') {
+    socket.emit('requestErrorLogs');
+  } else if (section !== 'dashboard' && section !== 'reports') {
+    socket.emit('requestGameState');
+  }
+}, 300);
+
+function renderSection(section, state = null) {
+  const content = document.getElementById('content');
+  content.innerHTML = '<div class="flex justify-center items-center h-64"><div class="loading-spinner"></div></div>';
+
+  if (section === 'dashboard') {
+    content.innerHTML = `
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        <div class="metric-card">
+          <h2 class="metric-label">Game Status</h2>
+          <p class="metric-value" id="game-status">Loading...</p>
+          <p>Game ID: <span id="game-id">N/A</span></p>
+          <p>Next Draw: <span id="timer">30s</span></p>
+          <p>Location: <span id="game-location">N/A</span></p>
+          <p>Active Players: <span id="active-players">0</span></p>
+        </div>
+        <div class="metric-card">
+          <h2 class="metric-label">Drawn Balls</h2>
+          <p class="metric-value" id="drawn-balls">None</p>
+          <p id="bonus-ball" class="text-orange-600"></p>
+          <p>Remaining Balls: <span id="remaining-balls">48</span></p>
+          <p>Recent Draws: <span id="recent-balls">None</span></p>
+        </div>
+        <div class="metric-card">
+          <div class="flex justify-between items-center">
+            <h2 class="metric-label">Financial Overview</h2>
+            <button onclick="generateIncomeReport()" class="btn btn-primary text-sm">Generate Report</button>
+          </div>
+          <p class="metric-value" id="total-earned">$0.00</p>
+          <p>Pending Collection: <span id="pending-collection">$0.00</span></p>
+          <p>Today's Earnings: <span id="today-earnings">$0.00</span></p>
+        </div>
+        <div class="metric-card">
+          <h2 class="metric-label">System Status</h2>
+          <p class="metric-value" id="total-cashiers">0 Cashiers</p>
+          <p id="total-displays">0 Displays</p>
+          <p id="total-locations">0 Locations</p>
+        </div>
+      </div>
+      <div class="card-elevated mt-6">
+        <h2 class="text-lg font-semibold text-gray-800 mb-2 p-4">Recent Activity</h2>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Event</th>
+                <th>Details</th>
+                <th>Time</th>
+              </tr>
+            </thead>
+            <tbody id="recent-activity">
+              <tr><td colspan="3" class="text-center">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+    if (state) updateDashboard(state);
+  } else if (section === 'locations') {
+    const locations = state?.locations || [];
+    content.innerHTML = `
+      <div class="card-elevated mt-6">
+        <div class="flex justify-between items-center mb-4 p-4">
+          <h2 class="text-lg font-semibold text-gray-800">Locations</h2>
+          <button onclick="showAddLocationModal()" class="btn btn-primary">
+            <i class="fas fa-plus mr-2"></i>Add Location
+          </button>
+        </div>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Address</th>
+                <th>Maximum Win</th>
+                <th>Rules</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="locations-table">
+              ${locations.length === 0 ? '<tr><td colspan="5" class="text-center">No locations available</td></tr>' : 
+                locations.map(location => `
+                  <tr>
+                    <td>${location.name || 'N/A'}</td>
+                    <td>${location.address || 'N/A'}</td>
+                    <td>${formatCurrency(location.max_win || 0)}</td>
+                    <td>${JSON.stringify(location.rules) || '{}'}</td>
+                    <td><span class="status-badge status-${location.active ? 'active' : 'inactive'}">${location.active ? 'Active' : 'Inactive'}</span></td>
+                  </tr>
+                `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  } else if (section === 'cashiers') {
+    const cashiers = state?.cashiers || [];
+    const locations = state?.locations || [];
+    content.innerHTML = `
+      <div class="card-elevated mt-6">
+        <div class="flex justify-between items-center mb-4 p-4">
+          <h2 class="text-lg font-semibold text-gray-800">Cashiers</h2>
+          <button onclick="showAddCashierModal()" class="btn btn-primary">
+            <i class="fas fa-plus mr-2"></i>Add Cashier
+          </button>
+        </div>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Username</th>
+                <th>Location</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="cashiers-table">
+              ${cashiers.length === 0 ? '<tr><td colspan="3" class="text-center">No cashiers available</td></tr>' : 
+                cashiers.map(cashier => `
+                  <tr>
+                    <td>${cashier.username || 'N/A'}</td>
+                    <td>${locations.find(l => l.id === cashier.location_id)?.name || 'N/A'}</td>
+                    <td><span class="status-badge status-${cashier.status === 'active' ? 'active' : 'inactive'}">${cashier.status || 'N/A'}</span></td>
+                  </tr>
+                `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  } else if (section === 'screens') {
+    const screens = state?.screens || [];
+    const locations = state?.locations || [];
+    content.innerHTML = `
+      <div class="card-elevated mt-6">
+        <div class="flex justify-between items-center mb-4 p-4">
+          <h2 class="text-lg font-semibold text-gray-800">Display Screens</h2>
+          <button onclick="showAddScreenModal()" class="btn btn-primary">
+            <i class="fas fa-plus mr-2"></i>Add Display Screen
+          </button>
+        </div>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Assigned Location</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="screens-table">
+              ${screens.length === 0 ? '<tr><td colspan="3" class="text-center">No display screens available</td></tr>' : 
+                screens.map(screen => `
+                  <tr>
+                    <td>${screen.name || 'N/A'}</td>
+                    <td>${locations.find(l => l.id === screen.location_id)?.name || 'N/A'}</td>
+                    <td><span class="status-badge status-${screen.status === 'active' ? 'active' : 'inactive'}">${screen.status || 'N/A'}</span></td>
+                  </tr>
+                `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  } else if (section === 'jackpots') {
+    const jackpots = state?.jackpotTiers || [
+      { id: '1', name: 'Gold', prizeAmount: 10000, active: true },
+      { id: '2', name: 'Silver', prizeAmount: 5000, active: true },
+      { id: '3', name: 'Bronze', prizeAmount: 2000, active: true }
+    ];
+    const locations = state?.locations || [];
+    content.innerHTML = `
+      <div class="card-elevated mt-6">
+        <div class="flex justify-between items-center mb-4 p-4">
+          <h2 class="text-lg font-semibold text-gray-800">Jackpot Tiers</h2>
+        </div>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Tier Name</th>
+                <th>Prize Amount</th>
+                <th>Assigned Locations</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="jackpots-table">
+              ${jackpots.length === 0 ? '<tr><td colspan="5" class="text-center">No jackpot tiers available</td></tr>' : 
+                jackpots.map(tier => {
+                  const assignedLocations = locations.filter(l => l.jackpotTier === tier.name).map(l => l.name).join(', ') || 'None';
+                  return `
+                    <tr>
+                      <td>${tier.name || 'N/A'}</td>
+                      <td>${formatCurrency(tier.prizeAmount || 0)}</td>
+                      <td>${assignedLocations}</td>
+                      <td><span class="status-badge status-${tier.active ? 'active' : 'inactive'}">${tier.active ? 'Active' : 'Inactive'}</span></td>
+                      <td>
+                        <button onclick="showUpdateJackpotModal(${JSON.stringify(tier)})" class="btn btn-primary text-sm">
+                          <i class="fas fa-edit mr-2"></i>Edit
+                        </button>
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  } else if (section === 'financials') {
+    const financials = state?.financials || [];
+    content.innerHTML = `
+      <div class="card-elevated mt-6">
+        <div class="flex justify-between items-center mb-4 p-4">
+          <h2 class="text-lg font-semibold text-gray-800">Financials</h2>
+          <button onclick="generateIncomeReport()" class="btn btn-primary">
+            <i class="fas fa-file-alt mr-2"></i>Generate Report
+          </button>
+        </div>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Location</th>
+                <th>Cashier</th>
+                <th>Total Amount Earned</th>
+                <th>Collected</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="financials-table">
+              ${financials.length === 0 ? '<tr><td colspan="5" class="text-center">No financial data available</td></tr>' : 
+                financials.map(data => `
+                  <tr>
+                    <td>${data.location_name || 'N/A'}</td>
+                    <td>${data.cashier_name || 'N/A'}</td>
+                    <td>${formatCurrency(data.total_earned || 0)}</td>
+                    <td><span class="status-badge status-${data.all_collected ? 'collected' : 'inactive'}">${data.all_collected ? 'Collected' : 'Pending'}</span></td>
+                    <td>
+                      ${!data.all_collected && data.total_earned > 0 ? `
+                        <button onclick="collectEarnings('${data.cashier_id}')" class="btn btn-primary text-sm">
+                          <i class="fas fa-check-circle mr-2"></i>Collect
+                        </button>
+                      ` : ''}
+                    </td>
+                  </tr>
+                `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  } else if (section === 'reports') {
+    content.innerHTML = `
+      <div class="card-elevated mt-6">
+        <div class="flex justify-between items-center mb-4 p-4">
+          <h2 class="text-lg font-semibold text-gray-800">Reports</h2>
+          <div class="flex gap-3">
+            <button onclick="generateIncomeReport()" class="btn btn-primary">
+              <i class="fas fa-file-alt mr-2"></i>Income Report
+            </button>
+            <button onclick="showWinTicketsReportModal()" class="btn btn-primary">
+              <i class="fas fa-ticket-alt mr-2"></i>Win Tickets Report
+            </button>
+          </div>
+        </div>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Report Type</th>
+                <th>Description</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Income Report</td>
+                <td>Summary of all income transactions</td>
+                <td>
+                  <button onclick="generateIncomeReport()" class="btn btn-primary text-sm">
+                    <i class="fas fa-file-alt mr-2"></i>Generate
+                  </button>
+                </td>
+              </tr>
+              <tr>
+                <td>Win Tickets Report</td>
+                <td>Details of all winning tickets with cashier, location, and balance</td>
+                <td>
+                  <button onclick="showWinTicketsReportModal()" class="btn btn-primary text-sm">
+                    <i class="fas fa-ticket-alt mr-2"></i>Generate
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  } else if (section === 'error-logs') {
+    const errors = state?.errorLogs || [];
+    content.innerHTML = `
+      <div class="card-elevated mt-6">
+        <div class="flex justify-between items-center mb-4 p-4">
+          <h2 class="text-lg font-semibold text-gray-800">Error Logs</h2>
+        </div>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Error Message</th>
+                <th>Location</th>
+                <th>Cashier</th>
+                <th>Severity</th>
+              </tr>
+            </thead>
+            <tbody id="error-logs-table">
+              ${errors.length === 0 ? '<tr><td colspan="5" class="text-center">No error logs available</td></tr>' : 
+                errors.map(error => `
+                  <tr>
+                    <td>${formatDate(error.timestamp)}</td>
+                    <td>${error.message || 'N/A'}</td>
+                    <td>${error.location_name || 'N/A'}</td>
+                    <td>${error.cashier_name || 'N/A'}</td>
+                    <td><span class="status-badge status-${error.severity === 'high' ? 'inactive' : 'active'}">${error.severity || 'N/A'}</span></td>
+                  </tr>
+                `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  initSocket();
+  document.getElementById('modal-close').addEventListener('click', () => {
+    document.getElementById('modal').style.display = 'none';
+  });
+  document.getElementById('modal-close-btn').addEventListener('click', () => {
+    document.getElementById('modal').style.display = 'none';
+  });
+  document.getElementById('toggle-sidebar').addEventListener('click', () => {
+    const sidebar = document.getElementById('sidebar');
+    const mainContent = document.getElementById('main-content');
+    sidebar.classList.toggle('collapsed');
+    mainContent.classList.toggle('collapsed');
+  });
+});
+
+function generateIncomeReport() {
+  socket.emit('generateReport', { reportType: 'income', filters: {} });
+}
   </script>
 </body>
 </html>

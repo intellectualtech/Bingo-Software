@@ -31,7 +31,7 @@
     async function initSocket(token) {
       const port = await getServerPort();
       const socket = io(`http://localhost:${port}`, {
-        auth: { token }, // Use auth instead of query for better security
+        auth: { token },
         reconnectionAttempts: 5,
         reconnectionDelay: 1000,
         timeout: 10000
@@ -129,8 +129,8 @@
       loadingSpinner.classList.remove('hidden');
 
       try {
-        // Send login request to server
-        const response = await fetch('http://localhost:3000/login', {
+        const port = await getServerPort();
+        const response = await fetch(`http://localhost:${port}/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, password })
@@ -138,13 +138,8 @@
         const data = await response.json();
 
         if (data.token && data.role) {
-          // Store token in localStorage
           localStorage.setItem('token', data.token);
-
-          // Initialize socket with token
           const { socket, role } = await initSocket(data.token);
-
-          // Redirect based on role
           if (role === 'admin') {
             window.location.href = '/admin.html';
           } else if (role === 'cashier') {

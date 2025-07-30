@@ -659,7 +659,7 @@
           <span id="connection-status">Connecting...</span>
         </div>
         <div>Session: <span id="game-id">Waiting...</span></div>
-        <div class="balance">250.16 NAD</div>
+        <div class="balance" id="balance">Loading...</div>
       </div>
     </div>
     
@@ -708,7 +708,7 @@
           </div>
           <div class="bet-row">
             <span class="bet-label">Stake Amount:</span>
-            <input type="number" class="bet-input" id="stakeInput" value="106.00" min="1" step="0.01" onchange="updateStake()">
+            <input type="number" class="bet-input" id="stakeInput" value="" min="1" step="0.01" onchange="updateStake()">
           </div>
         </div>
         
@@ -762,14 +762,14 @@
 
   <script>
     let selectedNumbers = [];
-    let currentStake = 106.00;
+    let currentStake = 0;
     let betType = 'future1';
     let ticketQueue = [];
     let gameState = {
       isRunning: false,
       drawnBalls: [],
       availableBalls: Array.from({length: 48}, (_, i) => i + 1),
-      gameId: "BG-" + Math.floor(10000 + Math.random() * 90000),
+      gameId: null,
       currentBall: null,
       recentBalls: [],
       lastUpdate: Date.now(),
@@ -780,6 +780,7 @@
     const connectionStatus = document.getElementById('connection-status');
     const gameIdDisplay = document.getElementById('game-id');
     const currentTime = document.getElementById('current-time');
+    const balanceDisplay = document.getElementById('balance');
     const playTicketBtn = document.getElementById('play-ticket-btn');
     const queuedTicketsDisplay = document.getElementById('queued-tickets');
 
@@ -812,6 +813,31 @@
       }
     }
 
+    async function fetchBalance() {
+      const token = localStorage.getItem('token');
+      // Only fetch if we have a valid gameId from the server
+      if (!gameState.gameId) {
+        balanceDisplay.textContent = '0.00 NAD';
+        return;
+      }
+      try {
+        const response = await fetch(`http://localhost:3000/get-total-earnings?gameId=${gameState.gameId}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        if (data.success) {
+          balanceDisplay.textContent = `${parseFloat(data.totalEarnings).toFixed(2)} NAD`;
+        } else {
+          showNotification(data.message || 'Failed to fetch balance', 'error');
+          balanceDisplay.textContent = '0.00 NAD';
+        }
+      } catch (err) {
+        console.error('Error fetching balance:', err);
+        showNotification('Error fetching balance', 'error');
+        balanceDisplay.textContent = '0.00 NAD';
+      }
+    }
+
     function setupSocketHandlers() {
       socket.on('connect', () => {
         console.log('Socket connected, ID:', socket.id);
@@ -824,6 +850,7 @@
         showNotification(`Connected as ${role}`, 'success');
         socket.emit('requestGameState');
         fetchTickets();
+        // Remove fetchBalance() here, will call after receiving gameState
       });
 
       socket.on('authError', (message) => {
@@ -844,6 +871,7 @@
         gameState = { ...gameState, ...newState };
         updateGameStatus();
         fetchTickets();
+        fetchBalance(); // Only call fetchBalance after receiving gameState from server
       });
 
       socket.on('gameStarted', (data) => {
@@ -884,7 +912,6 @@
       socket.on('autoDrawPaused', () => {
         console.log('Received autoDrawPaused');
         gameState.isRunning = false;
-        // Assign a new game ID when the game ends
         gameState.gameId = "BG-" + Math.floor(10000 + Math.random() * 90000);
         gameState.drawnBalls = [];
         gameState.availableBalls = Array.from({length: 48}, (_, i) => i + 1);
@@ -920,6 +947,13 @@
         console.error('Connection error:', err.message);
         showNotification('Connection error: ' + err.message, 'error');
         updateGameStatus();
+      });
+
+      socket.on('balanceUpdate', ({ gameId, totalEarnings }) => {
+        if (gameId === gameState.gameId) {
+          balanceDisplay.textContent = `${totalEarnings.toFixed(2)} NAD`;
+          showNotification('Balance updated', 'success');
+        }
       });
     }
 
@@ -961,6 +995,7 @@
       updateTime();
       setInterval(updateTime, 1000);
       initSocket();
+      fetchBalance();
     }
 
     function initBallGrid() {
@@ -1014,7 +1049,7 @@
     }
 
     function updateStake() {
-      currentStake = parseFloat(document.getElementById('stakeInput').value) || 106.00;
+      currentStake = parseFloat(document.getElementById('stakeInput').value) || 0;
       updatePlayButton();
     }
 
@@ -1024,19 +1059,18 @@
     }
 
     function randomSelect(count) {
-      if (selectedNumbers.length >= 48) return;
+      // Always clear previous selection and pick exactly 'count' random numbers from 1-48
       selectedNumbers = [];
-      const available = gameState.availableBalls.filter(b => !selectedNumbers.includes(b));
-      const toSelect = Math.min(count, available.length);
-      const newNumbers = [];
-      while (newNumbers.length < toSelect) {
-        const rand = Math.floor(Math.random() * available.length);
-        const num = available[rand];
-        if (!newNumbers.includes(num)) newNumbers.push(num);
+      const available = Array.from({length: 48}, (_, i) => i + 1);
+      while (selectedNumbers.length < count && available.length > 0) {
+        const randIdx = Math.floor(Math.random() * available.length);
+        const num = available.splice(randIdx, 1)[0];
+        selectedNumbers.push(num);
       }
-      selectedNumbers = [...new Set([...selectedNumbers, ...newNumbers])].sort((a, b) => a - b);
+      selectedNumbers.sort((a, b) => a - b);
       updateBallGrid();
       updateSelectedNumbersDisplay();
+      // Set stake according to count
       currentStake = count === 6 ? 5.00 : count === 7 ? 6.00 : count === 8 ? 8.00 : count === 9 ? 9.00 : count === 10 ? 10.00 : currentStake;
       document.getElementById('stakeInput').value = currentStake.toFixed(2);
     }
@@ -1096,8 +1130,15 @@
     }
 
     function playAllColors() {
+      // Always clear previous selection and pick 15 random numbers from 1-48
       selectedNumbers = [];
-      for (let i = 1; i <= 15; i++) selectedNumbers.push(i);
+      const available = Array.from({length: 48}, (_, i) => i + 1);
+      while (selectedNumbers.length < 15 && available.length > 0) {
+        const randIdx = Math.floor(Math.random() * available.length);
+        const num = available.splice(randIdx, 1)[0];
+        selectedNumbers.push(num);
+      }
+      selectedNumbers.sort((a, b) => a - b);
       updateBallGrid();
       updateSelectedNumbersDisplay();
       currentStake = 150.00;
@@ -1113,26 +1154,57 @@
       showNotification('Ticket copied to clipboard');
     }
 
-    function confirmTicket() {
+    async function confirmTicket() {
       if (selectedNumbers.length < 6 || (selectedNumbers.length > 6 && selectedNumbers.length > 10)) {
         showNotification('Select 6 to 10 numbers per set', 'error');
         return;
       }
       const ticketSets = [];
       const setSize = selectedNumbers.length;
+      let stakeAmount = 0;
       if (setSize >= 6 && setSize <= 10) {
+        stakeAmount = setSize === 6 ? 5.00 : setSize === 7 ? 6.00 : setSize === 8 ? 8.00 : setSize === 9 ? 9.00 : 10.00;
         ticketSets.push({
           numbers: [...selectedNumbers].sort((a, b) => a - b),
-          stake: setSize === 6 ? 5.00 : setSize === 7 ? 6.00 : setSize === 8 ? 8.00 : setSize === 9 ? 9.00 : 10.00,
+          stake: stakeAmount,
           type: betType,
           slipNumber: `T-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
         });
       }
       ticketQueue.push(...ticketSets);
       renderQueuedTickets();
+      
+      const token = localStorage.getItem('token');
+      if (token && stakeAmount > 0) {
+        try {
+          const response = await fetch('http://localhost:3000/earn', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              gameId: gameState.gameId,
+              slipNumber: ticketSets[0].slipNumber,
+              playerName: 'CashierUser',
+              amount: stakeAmount
+            })
+          });
+          const data = await response.json();
+          if (!data.success) {
+            showNotification(data.message || 'Failed to record earnings', 'error');
+          }
+          fetchBalance();
+        } catch (err) {
+          console.error('Error recording earnings:', err);
+          showNotification('Error recording earnings', 'error');
+        }
+      }
+
       selectedNumbers = [];
       updateBallGrid();
       updateSelectedNumbersDisplay();
+      document.getElementById('stakeInput').value = stakeAmount.toFixed(2);
       showNotification(`Ticket with ${ticketSets.length} set(s) queued`);
     }
 
@@ -1174,9 +1246,10 @@
             showNotification(data.message || `Failed to sell ticket ${ticket.slipNumber}`, 'error');
           }
         }
-        ticketQueue = []; // Clear the queue after playing all tickets
+        ticketQueue = [];
         renderQueuedTickets();
         updatePlayButton();
+        fetchBalance();
       } catch (err) {
         console.error('Error playing tickets:', err);
         showNotification('Error playing tickets', 'error');
@@ -1263,6 +1336,8 @@
       playTicketBtn.disabled = !socket.connected || gameState.isRunning || !gameState.gameId || ticketQueue.length === 0;
       updateBallGrid();
       renderQueuedTickets();
+      // Optionally, fetchBalance() here if you want to update on every status change
+      // fetchBalance();
     }
 
     function showNotification(message, type = 'success') {
@@ -1314,6 +1389,7 @@
       setInterval(updateTime, 1000);
       updateTime();
       updatePlayButton();
+      // Remove fetchBalance() here, will be called after receiving gameState
     });
   </script>
 </body>
