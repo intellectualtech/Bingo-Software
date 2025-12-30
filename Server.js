@@ -31,10 +31,10 @@ const BONUS_BALL_THRESHOLD = 10;
 const AUTO_DRAW_INTERVAL = 4167;
 
 const pool = mysql.createPool({
-  host: 'localhost',
-  user: 'root',
-  password: 'David',
-  database: 'bingo',
+  host: '193.203.168.188',
+  user: 'u494753093_bingo1',
+  password: 'Party@nextd00r',
+  database: 'u494753093_bingo1',
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
